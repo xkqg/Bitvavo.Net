@@ -11,5 +11,5 @@ namespace Bitvavo.Net.Enums;
 public enum TriggerType
 {
     /// <summary>Trigger fires when the chosen price reference reaches the specified amount.</summary>
-    [Map("price")] Price,
+    [Map("price")] Price = 0,
 }

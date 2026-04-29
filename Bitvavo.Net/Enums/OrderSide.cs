@@ -11,7 +11,7 @@ namespace Bitvavo.Net.Enums;
 public enum OrderSide
 {
     /// <summary>Buy the base asset (e.g. acquire ETH paying EUR).</summary>
-    [Map("buy")] Buy,
+    [Map("buy")] Buy = 0,
     /// <summary>Sell the base asset (e.g. dispose of ETH for EUR).</summary>
-    [Map("sell")] Sell,
+    [Map("sell")] Sell = 1,
 }

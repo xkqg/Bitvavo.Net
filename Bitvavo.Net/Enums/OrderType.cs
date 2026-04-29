@@ -11,15 +11,15 @@ namespace Bitvavo.Net.Enums;
 public enum OrderType
 {
     /// <summary>Market order — fills immediately at best available prices.</summary>
-    [Map("market")] Market,
+    [Map("market")] Market = 0,
     /// <summary>Limit order — fills only at the specified price or better; rests on the book if not immediately marketable.</summary>
-    [Map("limit")] Limit,
+    [Map("limit")] Limit = 1,
     /// <summary>Stop-loss market order — triggers a market order when the trigger price is hit.</summary>
-    [Map("stopLoss")] StopLoss,
+    [Map("stopLoss")] StopLoss = 2,
     /// <summary>Stop-loss limit order — triggers a limit order when the trigger price is hit.</summary>
-    [Map("stopLossLimit")] StopLossLimit,
+    [Map("stopLossLimit")] StopLossLimit = 3,
     /// <summary>Take-profit market order — triggers a market order when the trigger price is hit.</summary>
-    [Map("takeProfit")] TakeProfit,
+    [Map("takeProfit")] TakeProfit = 4,
     /// <summary>Take-profit limit order — triggers a limit order when the trigger price is hit.</summary>
-    [Map("takeProfitLimit")] TakeProfitLimit,
+    [Map("takeProfitLimit")] TakeProfitLimit = 5,
 }

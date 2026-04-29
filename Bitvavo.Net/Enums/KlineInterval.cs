@@ -15,29 +15,29 @@ namespace Bitvavo.Net.Enums;
 public enum KlineInterval
 {
     /// <summary>1 minute.</summary>
-    [Map("1m")] OneMinute,
+    [Map("1m")] OneMinute = 0,
     /// <summary>5 minutes.</summary>
-    [Map("5m")] FiveMinutes,
+    [Map("5m")] FiveMinutes = 1,
     /// <summary>15 minutes.</summary>
-    [Map("15m")] FifteenMinutes,
+    [Map("15m")] FifteenMinutes = 2,
     /// <summary>30 minutes.</summary>
-    [Map("30m")] ThirtyMinutes,
+    [Map("30m")] ThirtyMinutes = 3,
     /// <summary>1 hour.</summary>
-    [Map("1h")] OneHour,
+    [Map("1h")] OneHour = 4,
     /// <summary>2 hours.</summary>
-    [Map("2h")] TwoHours,
+    [Map("2h")] TwoHours = 5,
     /// <summary>4 hours.</summary>
-    [Map("4h")] FourHours,
+    [Map("4h")] FourHours = 6,
     /// <summary>6 hours.</summary>
-    [Map("6h")] SixHours,
+    [Map("6h")] SixHours = 7,
     /// <summary>8 hours.</summary>
-    [Map("8h")] EightHours,
+    [Map("8h")] EightHours = 8,
     /// <summary>12 hours.</summary>
-    [Map("12h")] TwelveHours,
+    [Map("12h")] TwelveHours = 9,
     /// <summary>1 day.</summary>
-    [Map("1d")] OneDay,
+    [Map("1d")] OneDay = 10,
     /// <summary>1 week.</summary>
-    [Map("1w")] OneWeek,
+    [Map("1w")] OneWeek = 11,
     /// <summary>1 month. Wire token is capital <c>"1M"</c> (lowercase <c>"1m"</c> means one minute).</summary>
-    [Map("1M")] OneMonth,
+    [Map("1M")] OneMonth = 12,
 }

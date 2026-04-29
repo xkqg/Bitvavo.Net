@@ -11,9 +11,9 @@ namespace Bitvavo.Net.Enums;
 public enum TimeInForce
 {
     /// <summary>Good-till-canceled — rests on the book until filled or explicitly canceled. Default.</summary>
-    [Map("GTC")] GoodTillCanceled,
+    [Map("GTC")] GoodTillCanceled = 0,
     /// <summary>Immediate-or-cancel — fills what it can immediately, cancels the remainder.</summary>
-    [Map("IOC")] ImmediateOrCancel,
+    [Map("IOC")] ImmediateOrCancel = 1,
     /// <summary>Fill-or-kill — must fill in full immediately, otherwise canceled entirely.</summary>
-    [Map("FOK")] FillOrKill,
+    [Map("FOK")] FillOrKill = 2,
 }

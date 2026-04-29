@@ -29,9 +29,11 @@ public class BitvavoAuthenticationProviderTests
     private const string TestKey = "test-key";
     private const string TestSecret = "test-secret";
 
+    private readonly record struct AuthProviderContext(BitvavoAuthenticationProvider Provider, BitvavoRestClientSpotApi ApiClient);
+
     // ── helpers ───────────────────────────────────────────────────────────────────────────
 
-    private static (BitvavoAuthenticationProvider provider, BitvavoRestClientSpotApi apiClient) CreateProvider(int receiveWindowMs = 10_000)
+    private static AuthProviderContext CreateProvider(int receiveWindowMs = 10_000)
     {
         var handler = new StubHttpMessageHandler("{}");
         var http = new HttpClient(handler);
@@ -42,7 +44,7 @@ public class BitvavoAuthenticationProviderTests
         var client = new BitvavoRestClient(http, null, Options.Create(opts));
         var apiClient = (BitvavoRestClientSpotApi)client.SpotApi;
         var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials(TestKey, TestSecret), receiveWindowMs);
-        return (provider, apiClient);
+        return new AuthProviderContext(provider, apiClient);
     }
 
     private static RestRequestConfiguration BuildConfig(

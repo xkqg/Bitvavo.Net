@@ -11,11 +11,11 @@ namespace Bitvavo.Net.Enums;
 public enum SelfTradePrevention
 {
     /// <summary>Decrement both quantities and cancel both orders.</summary>
-    [Map("decrementAndCancel")] DecrementAndCancel,
+    [Map("decrementAndCancel")] DecrementAndCancel = 0,
     /// <summary>Cancel the older of the two orders, let the newer fill.</summary>
-    [Map("cancelOldest")] CancelOldest,
+    [Map("cancelOldest")] CancelOldest = 1,
     /// <summary>Cancel the newer of the two orders, let the older remain.</summary>
-    [Map("cancelNewest")] CancelNewest,
+    [Map("cancelNewest")] CancelNewest = 2,
     /// <summary>Cancel both orders entirely.</summary>
-    [Map("cancelBoth")] CancelBoth,
+    [Map("cancelBoth")] CancelBoth = 3,
 }
