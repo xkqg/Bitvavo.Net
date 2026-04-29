@@ -34,7 +34,7 @@ internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironmen
     /// <c>_definitions.GetOrCreate(method, path, RateLimitGate, weight, authenticated)</c>;
     /// per-endpoint weight tables are tracked for v0.4.0 rollout (see CHANGELOG).
     /// </summary>
-    private const int ClientSafetyMargin = 200;
+    private const int ClientSafetyMargin = 100;
     internal static readonly IRateLimitGate RateLimitGate = new RateLimitGate("Bitvavo")
         .AddGuard(new RateLimitGuard(
             keySelector: RateLimitGuard.PerHost,
