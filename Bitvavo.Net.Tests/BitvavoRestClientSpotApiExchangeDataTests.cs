@@ -84,6 +84,31 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     // ── GetKlinesAsync ────────────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task GetKlinesAsync_handles_scientific_notation_for_subcent_coins()
+    {
+        // Bitvavo emits sub-cent prices in scientific notation (e.g. VTHO at "1e-8").
+        // The default System.Text.Json decimal parser uses NumberStyles.Number which rejects
+        // exponent notation; without a custom converter every kline for low-value coins fails
+        // with "The input string '1e-8' was not in a correct format".
+        const string json = """
+        [
+          [1714132800000, "1e-8", "1.5e-7", "5e-9", "1.2e-8", "1000000.5"]
+        ]
+        """;
+        var client = ClientReturning(json, out _);
+
+        var result = await client.SpotApi.ExchangeData.GetKlinesAsync("VTHO-EUR", KlineInterval.OneHour, limit: 1, ct: TestContext.Current.CancellationToken);
+
+        result.Success.ShouldBeTrue();
+        var candle = result.Data.Single();
+        candle.OpenPrice.ShouldBe(0.00000001m);
+        candle.HighPrice.ShouldBe(0.00000015m);
+        candle.LowPrice.ShouldBe(0.000000005m);
+        candle.ClosePrice.ShouldBe(0.000000012m);
+        candle.Volume.ShouldBe(1000000.5m);
+    }
+
+    [Fact]
     public async Task GetKlinesAsync_maps_2D_array_to_OHLCV_records()
     {
         // Bitvavo returns candles as positional arrays: [ts_ms, open, high, low, close, volume]

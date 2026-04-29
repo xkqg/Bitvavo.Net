@@ -17,6 +17,12 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// <see cref="ArrayConverter{T}"/>: the converter constructs the record then assigns each
 /// <see cref="ArrayPropertyAttribute"/>-tagged member by index. Init-only properties or a
 /// positional-record syntax would not work here.
+/// <para>
+/// Each decimal field uses <see cref="DecimalConverter"/> so sub-cent coins (e.g. VTHO at
+/// <c>"1e-8"</c>) deserialise correctly. The default System.Text.Json decimal parser uses
+/// <c>NumberStyles.Number</c> which rejects exponent notation; <see cref="DecimalConverter"/>
+/// uses <c>NumberStyles.Float</c>.
+/// </para>
 /// </remarks>
 [JsonConverter(typeof(ArrayConverter<BitvavoKline>))]
 public record BitvavoKline
@@ -26,22 +32,22 @@ public record BitvavoKline
     public DateTime OpenTime { get; set; }
 
     /// <summary>Open price.</summary>
-    [ArrayProperty(1)]
+    [ArrayProperty(1), JsonConverter(typeof(DecimalConverter))]
     public decimal OpenPrice { get; set; }
 
     /// <summary>High price.</summary>
-    [ArrayProperty(2)]
+    [ArrayProperty(2), JsonConverter(typeof(DecimalConverter))]
     public decimal HighPrice { get; set; }
 
     /// <summary>Low price.</summary>
-    [ArrayProperty(3)]
+    [ArrayProperty(3), JsonConverter(typeof(DecimalConverter))]
     public decimal LowPrice { get; set; }
 
     /// <summary>Close price.</summary>
-    [ArrayProperty(4)]
+    [ArrayProperty(4), JsonConverter(typeof(DecimalConverter))]
     public decimal ClosePrice { get; set; }
 
     /// <summary>Volume traded during the candle period (base-asset units).</summary>
-    [ArrayProperty(5)]
+    [ArrayProperty(5), JsonConverter(typeof(DecimalConverter))]
     public decimal Volume { get; set; }
 }
