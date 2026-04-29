@@ -1,0 +1,6 @@
+> { "action": "authenticate", "key": "test-key", "signature": "_", "timestamp": 0, "window": 10000 }
+=
+{ "event": "authenticate", "authenticated": true }
+> { "action": "subscribe", "channels": [{ "name": "account", "markets": ["ETH-EUR"] }] }
+=
+{ "event": "fill", "market": "ETH-EUR", "orderId": "1be6d0df-d5dc-4b53-a250-3376f3b393e6", "fillId": "f-7b2a3c1d-9e4f-4a5b-8c6d-2e1f0a3b4c5d", "timestamp": 1714132850000, "amount": "0.5", "side": "buy", "price": "1500", "taker": false, "fee": "0.6", "feeCurrency": "EUR" }

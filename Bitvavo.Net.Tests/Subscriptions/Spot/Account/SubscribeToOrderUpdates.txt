@@ -1,0 +1,6 @@
+> { "action": "authenticate", "key": "test-key", "signature": "_", "timestamp": 0, "window": 10000 }
+=
+{ "event": "authenticate", "authenticated": true }
+> { "action": "subscribe", "channels": [{ "name": "account", "markets": ["ETH-EUR"] }] }
+=
+{ "event": "order", "orderId": "1be6d0df-d5dc-4b53-a250-3376f3b393e6", "market": "ETH-EUR", "created": 1714132800000, "updated": 1714132800500, "status": "new", "side": "buy", "orderType": "limit", "amount": "0.5", "amountRemaining": "0.5", "price": "1500", "onHold": "750", "onHoldCurrency": "EUR", "timeInForce": "GTC", "postOnly": false, "selfTradePrevention": "decrementAndCancel", "filledAmount": "0", "filledAmountQuote": "0", "executionType": "new" }

@@ -1,0 +1,4 @@
+>1 { "action": "subscribe", "channels": [{ "name": "candles", "interval": ["1h"], "markets": ["ETH-EUR"] }] }
+>2 { "action": "subscribe", "channels": [{ "name": "candles", "interval": ["1d"], "markets": ["ETH-EUR"] }] }
+=1 { "event": "candle", "market": "ETH-EUR", "interval": "1h", "candle": [[1714132800000, "2003.35", "2004.46", "2001.95", "2004.20", "28.85"]] }
+=2 { "event": "candle", "market": "ETH-EUR", "interval": "1d", "candle": [[1714089600000, "1980.00", "2050.00", "1975.00", "2030.00", "1234.56"]] }

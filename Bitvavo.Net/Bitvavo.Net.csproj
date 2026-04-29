@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Bitvavo.Net</RootNamespace>
+    <AssemblyName>Bitvavo.Net</AssemblyName>
+
+    <!-- NuGet metadata — JKorf-conform, handoff-ready -->
+    <PackageId>Bitvavo.Net</PackageId>
+    <Version>0.3.0-preview</Version>
+    <Authors>H.P. Gansevoort</Authors>
+    <Description>A .NET client library for the Bitvavo REST and WebSocket APIs, built on the CryptoExchange.Net base library — strongly typed models, automatic WebSocket reconnection, client-side rate limiting, and seamless integration with other CryptoExchange.Net based clients (Binance.Net, Kraken.Net, etc.).</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/JKorf/Bitvavo.Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/JKorf/Bitvavo.Net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>Bitvavo Bitvavo.Net Bitvavo Client Bitvavo API CryptoCurrency CryptoCurrency Exchange CryptoExchange.Net</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- PackageIcon intentionally omitted for v0.3.0-preview — add a 128x128 PNG before JKorf submission. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CryptoExchange.Net" Version="11.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Bitvavo.Net.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

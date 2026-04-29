@@ -1,0 +1,3 @@
+> { "action": "subscribe", "channels": [{ "name": "trades", "markets": ["BTC-EUR"] }] }
+=
+{ "event": "trade", "timestamp": 1548685870299, "market": "BTC-EUR", "id": "616bfa4e-b3ff-4b3f-a394-1538a49eb9bc", "amount": "1", "price": "2996", "side": "buy" }
