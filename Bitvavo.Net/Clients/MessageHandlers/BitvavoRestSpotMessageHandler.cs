@@ -3,6 +3,7 @@
 using System.IO;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using CryptoExchange.Net.Converters.SystemTextJson.MessageHandlers;
 using CryptoExchange.Net.Objects;
@@ -19,7 +20,15 @@ internal sealed class BitvavoRestSpotMessageHandler : JsonRestMessageHandler
 {
     private readonly ErrorMapping _errorMapping;
 
-    public override JsonSerializerOptions Options { get; } = new() { PropertyNameCaseInsensitive = true };
+    // Bitvavo emits prices, volumes, and amounts as JSON strings (e.g. "65841.00"). The
+    // REST candles endpoint returns mixed-type arrays — number timestamp + string prices —
+    // so AllowReadingFromString is required to deserialise into decimal fields. Mirrors the
+    // identical setting on BitvavoSocketSpotMessageHandler.
+    public override JsonSerializerOptions Options { get; } = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
+    };
 
     public BitvavoRestSpotMessageHandler(ErrorMapping errorMapping)
     {
@@ -32,8 +41,13 @@ internal sealed class BitvavoRestSpotMessageHandler : JsonRestMessageHandler
         var (parseError, document) = await GetJsonDocument(responseStream).ConfigureAwait(false);
         if (parseError != null) return parseError;
 
-        var code = document!.RootElement.TryGetProperty("errorCode", out var c) ? c.GetInt32().ToString() : null;
-        var msg  = document!.RootElement.TryGetProperty("error",     out var m) ? m.GetString()        : null;
+        // Defensive: only Bitvavo error envelopes are JSON objects. Some endpoints (e.g. /candles)
+        // return arrays, and TryGetProperty on a non-object element throws InvalidOperationException.
+        if (document!.RootElement.ValueKind != JsonValueKind.Object)
+            return new ServerError(ErrorInfo.Unknown);
+
+        var code = document.RootElement.TryGetProperty("errorCode", out var c) ? c.GetInt32().ToString() : null;
+        var msg  = document.RootElement.TryGetProperty("error",     out var m) ? m.GetString()        : null;
 
         if (code == null) return new ServerError(ErrorInfo.Unknown);
         return new ServerError(code, _errorMapping.GetErrorInfo(code, msg));
