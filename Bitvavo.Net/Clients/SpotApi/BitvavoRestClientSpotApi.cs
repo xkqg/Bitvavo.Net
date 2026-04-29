@@ -28,15 +28,18 @@ internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironmen
 {
     /// <summary>
     /// Per-host weight gate — Bitvavo enforces <see cref="BitvavoExchange.WeightPerMinute"/>
-    /// (1000) per IP per rolling minute. Endpoints opt in by passing this gate to
+    /// (1000) per IP per rolling minute. The gate undercuts that by <see cref="ClientSafetyMargin"/>
+    /// so client-side scheduling never races the server limit (avoids 429s and the resulting
+    /// IP throttle escalations). Endpoints opt in by passing this gate to
     /// <c>_definitions.GetOrCreate(method, path, RateLimitGate, weight, authenticated)</c>;
     /// per-endpoint weight tables are tracked for v0.4.0 rollout (see CHANGELOG).
     /// </summary>
+    private const int ClientSafetyMargin = 200;
     internal static readonly IRateLimitGate RateLimitGate = new RateLimitGate("Bitvavo")
         .AddGuard(new RateLimitGuard(
             keySelector: RateLimitGuard.PerHost,
             filter: new HostFilter("api.bitvavo.com"),
-            limit: BitvavoExchange.WeightPerMinute,
+            limit: BitvavoExchange.WeightPerMinute - ClientSafetyMargin,
             timeSpan: TimeSpan.FromMinutes(1),
             windowType: RateLimitWindowType.Sliding));
 
