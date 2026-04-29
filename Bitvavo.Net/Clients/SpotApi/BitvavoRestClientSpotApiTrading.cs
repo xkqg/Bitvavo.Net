@@ -43,7 +43,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         body.AddOptional("clientOrderId", request.ClientOrderId);
         body.AddOptional("codGroupId", request.CodGroupId);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Post, "v2/order", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Post, "v2/order", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoOrder>(def, queryParameters: null, bodyParameters: body, ct);
     }
 
@@ -89,10 +89,9 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         parameters.AddOptional("orderId", orderId);
         parameters.AddOptional("clientOrderId", clientOrderId);
 
-        // CryptoExchange.Net's framework default for DELETE is InBody; Bitvavo requires query-string params
-        // for DELETE /v2/order so the signing payload (which signs path + query, never body for non-POST/PUT)
-        // matches what the server sees.
-        var def = new RequestDefinition("v2/order", HttpMethod.Delete) { Authenticated = true, ParameterPosition = HttpMethodParameterPosition.InUri, Weight = 0 };
+        // Bitvavo signs path + query for DELETE (never body for non-POST/PUT), so parameters
+        // must land in the URI — see RequestDefinitionCacheExtensions.GetOrCreateInUri.
+        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/order", true);
         return _baseClient.SendAsync<BitvavoOrderId>(def, parameters, ct);
     }
 
@@ -102,7 +101,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         var parameters = new ParameterCollection();
         parameters.AddOptional("market", market);
 
-        var def = new RequestDefinition("v2/orders", HttpMethod.Delete) { Authenticated = true, ParameterPosition = HttpMethodParameterPosition.InUri, Weight = 0 };
+        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/orders", true);
         return _baseClient.SendAsync<IEnumerable<BitvavoOrderId>>(def, parameters, ct);
     }
 

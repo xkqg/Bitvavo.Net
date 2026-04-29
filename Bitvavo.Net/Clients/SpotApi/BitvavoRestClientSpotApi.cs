@@ -14,6 +14,10 @@ using CryptoExchange.Net.Converters.SystemTextJson;
 using CryptoExchange.Net.Interfaces;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Objects.Errors;
+using CryptoExchange.Net.RateLimiting;
+using CryptoExchange.Net.RateLimiting.Filters;
+using CryptoExchange.Net.RateLimiting.Guards;
+using CryptoExchange.Net.RateLimiting.Interfaces;
 using CryptoExchange.Net.SharedApis;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +26,20 @@ namespace Bitvavo.Net.Clients.SpotApi;
 /// <inheritdoc cref="IBitvavoRestClientSpotApi" />
 internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironment, BitvavoAuthenticationProvider, BitvavoCredentials>, IBitvavoRestClientSpotApi
 {
+    /// <summary>
+    /// Per-host weight gate — Bitvavo enforces <see cref="BitvavoExchange.WeightPerMinute"/>
+    /// (1000) per IP per rolling minute. Endpoints opt in by passing this gate to
+    /// <c>_definitions.GetOrCreate(method, path, RateLimitGate, weight, authenticated)</c>;
+    /// per-endpoint weight tables are tracked for v0.4.0 rollout (see CHANGELOG).
+    /// </summary>
+    internal static readonly IRateLimitGate RateLimitGate = new RateLimitGate("Bitvavo")
+        .AddGuard(new RateLimitGuard(
+            keySelector: RateLimitGuard.PerHost,
+            filter: new HostFilter("api.bitvavo.com"),
+            limit: BitvavoExchange.WeightPerMinute,
+            timeSpan: TimeSpan.FromMinutes(1),
+            windowType: RateLimitWindowType.Sliding));
+
     /// <inheritdoc />
     public new BitvavoRestOptions ClientOptions => (BitvavoRestOptions)base.ClientOptions;
 

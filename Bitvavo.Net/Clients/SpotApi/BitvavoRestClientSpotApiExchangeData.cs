@@ -27,7 +27,7 @@ internal sealed class BitvavoRestClientSpotApiExchangeData : IBitvavoRestClientS
     /// <inheritdoc />
     public Task<WebCallResult<IEnumerable<BitvavoMarket>>> GetMarketsAsync(CancellationToken ct = default)
     {
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/markets", false);
+        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/markets", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: false);
         return _baseClient.SendAsync<IEnumerable<BitvavoMarket>>(request, parameters: null, ct);
     }
 
@@ -46,7 +46,7 @@ internal sealed class BitvavoRestClientSpotApiExchangeData : IBitvavoRestClientS
         parameters.AddOptionalMilliseconds("start", startTime);
         parameters.AddOptionalMilliseconds("end", endTime);
 
-        var request = _definitions.GetOrCreate(HttpMethod.Get, $"v2/{market}/candles", false);
+        var request = _definitions.GetOrCreate(HttpMethod.Get, $"v2/{market}/candles", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: false);
         return _baseClient.SendAsync<IEnumerable<BitvavoKline>>(request, parameters, ct);
     }
 
@@ -93,7 +93,8 @@ internal sealed class BitvavoRestClientSpotApiExchangeData : IBitvavoRestClientS
         var parameters = new ParameterCollection();
         parameters.AddOptional("market", market);
 
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/ticker/24h", false);
+        // ticker/24h: weight=25 when no market filter (returns all markets), weight=1 otherwise.
+        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/ticker/24h", BitvavoRestClientSpotApi.RateLimitGate, weight: market is null ? 25 : 1, authenticated: false);
         return _baseClient.SendAsync<IEnumerable<BitvavoTicker24h>>(request, parameters, ct);
     }
 

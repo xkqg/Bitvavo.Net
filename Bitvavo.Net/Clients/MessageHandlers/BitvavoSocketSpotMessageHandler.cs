@@ -26,11 +26,10 @@ internal sealed class BitvavoSocketSpotMessageHandler : JsonSocketMessageHandler
     {
         AddTopicMapping<BitvavoStreamCandleEvent>(x => x.Market + x.Interval);
         AddTopicMapping<BitvavoStreamTrade>(x => x.Market);
-        // Private (account-channel) events: route by event-type only — every event already
-        // carries the market in its body, and the framework's account subscription filters
-        // there. No per-topic key needed.
-        AddTopicMapping<BitvavoStreamOrderUpdate>(_ => string.Empty);
-        AddTopicMapping<BitvavoStreamFillEvent>(_ => string.Empty);
+        // Private (account-channel) events: route per-market so two subscriptions on disjoint
+        // markets don't see each other's events. The market is always present in the event body.
+        AddTopicMapping<BitvavoStreamOrderUpdate>(x => x.Market);
+        AddTopicMapping<BitvavoStreamFillEvent>(x => x.Market);
         AddTopicMapping<Bitvavo.Net.Objects.Internal.BitvavoSocketAuthResponse>(_ => string.Empty);
     }
 

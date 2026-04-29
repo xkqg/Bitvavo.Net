@@ -10,6 +10,11 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// Single bid or ask in the order book — Bitvavo emits these as positional 2-element
 /// arrays <c>[price, size]</c>, so we decode via <see cref="ArrayConverter{T}"/>.
 /// </summary>
+/// <remarks>
+/// Mutable setters are required by <see cref="ArrayConverter{T}"/>: the converter assigns
+/// each <see cref="ArrayPropertyAttribute"/>-tagged property by index after constructing
+/// the record. Init-only properties would break decoding.
+/// </remarks>
 [JsonConverter(typeof(ArrayConverter<BitvavoOrderBookEntry>))]
 public record BitvavoOrderBookEntry
 {

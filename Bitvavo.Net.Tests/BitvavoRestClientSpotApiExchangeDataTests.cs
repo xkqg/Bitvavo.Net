@@ -46,7 +46,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetMarketsAsync();
+        var result = await client.SpotApi.ExchangeData.GetMarketsAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var markets = result.Data.ToList();
@@ -64,7 +64,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("[]", out var handler);
 
-        await client.SpotApi.ExchangeData.GetMarketsAsync();
+        await client.SpotApi.ExchangeData.GetMarketsAsync(ct: TestContext.Current.CancellationToken);
 
         handler.Requests.Count.ShouldBe(1);
         handler.Requests[0].Method.ShouldBe(HttpMethod.Get);
@@ -76,7 +76,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("""{"errorCode": 305, "error": "no markets"}""", HttpStatusCode.BadRequest, out _);
 
-        var result = await client.SpotApi.ExchangeData.GetMarketsAsync();
+        var result = await client.SpotApi.ExchangeData.GetMarketsAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeFalse();
     }
@@ -96,7 +96,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out _);
 
-        var result = await client.SpotApi.ExchangeData.GetKlinesAsync("ETH-EUR", KlineInterval.OneHour, limit: 2);
+        var result = await client.SpotApi.ExchangeData.GetKlinesAsync("ETH-EUR", KlineInterval.OneHour, limit: 2, ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var candles = result.Data.ToList();
@@ -114,7 +114,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("[]", out var handler);
 
-        await client.SpotApi.ExchangeData.GetKlinesAsync("BTC-EUR", KlineInterval.OneHour, limit: 100);
+        await client.SpotApi.ExchangeData.GetKlinesAsync("BTC-EUR", KlineInterval.OneHour, limit: 100, ct: TestContext.Current.CancellationToken);
 
         handler.Requests.Count.ShouldBe(1);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/BTC-EUR/candles");
@@ -129,7 +129,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         var start = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var end = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc);
 
-        await client.SpotApi.ExchangeData.GetKlinesAsync("ETH-EUR", KlineInterval.OneMinute, startTime: start, endTime: end);
+        await client.SpotApi.ExchangeData.GetKlinesAsync("ETH-EUR", KlineInterval.OneMinute, startTime: start, endTime: end, ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.Query.ShouldContain("start=1704067200000");
         handler.Requests[0].RequestUri!.Query.ShouldContain("end=1704153600000");
@@ -142,7 +142,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("""{"time": 1714132800000, "timeNs": 1714132800000000000}""", out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetServerTimeAsync();
+        var result = await client.SpotApi.ExchangeData.GetServerTimeAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/time");
@@ -157,7 +157,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("[]", out var handler);
 
-        await client.SpotApi.ExchangeData.GetAssetsAsync();
+        await client.SpotApi.ExchangeData.GetAssetsAsync(ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/assets");
         handler.Requests[0].RequestUri!.Query.ShouldBeEmpty();
@@ -175,7 +175,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetAssetsAsync(symbol: "BTC");
+        var result = await client.SpotApi.ExchangeData.GetAssetsAsync(symbol: "BTC", ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.Query.ShouldContain("symbol=BTC");
@@ -196,7 +196,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         const string json = """[{"market":"ETH-EUR","price":"2003.35"},{"market":"BTC-EUR","price":"50000"}]""";
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetTickerPricesAsync();
+        var result = await client.SpotApi.ExchangeData.GetTickerPricesAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/ticker/price");
@@ -211,7 +211,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
     {
         var client = ClientReturning("[]", out var handler);
 
-        await client.SpotApi.ExchangeData.GetTickerPricesAsync(market: "ETH-EUR");
+        await client.SpotApi.ExchangeData.GetTickerPricesAsync(market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.Query.ShouldContain("market=ETH-EUR");
     }
@@ -224,7 +224,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         const string json = """[{"market":"ETH-EUR","bid":"2002.50","bidSize":"3.5","ask":"2003.35","askSize":"5"}]""";
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetTickerBookAsync();
+        var result = await client.SpotApi.ExchangeData.GetTickerBookAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/ticker/book");
@@ -251,7 +251,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetTicker24hAsync();
+        var result = await client.SpotApi.ExchangeData.GetTicker24hAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/ticker/24h");
@@ -282,7 +282,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetOrderBookAsync(market: "ETH-EUR", depth: 50);
+        var result = await client.SpotApi.ExchangeData.GetOrderBookAsync(market: "ETH-EUR", depth: 50, ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/ETH-EUR/book");
@@ -308,7 +308,7 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         """;
         var client = ClientReturning(json, out var handler);
 
-        var result = await client.SpotApi.ExchangeData.GetPublicTradesAsync(market: "ETH-EUR", limit: 10);
+        var result = await client.SpotApi.ExchangeData.GetPublicTradesAsync(market: "ETH-EUR", limit: 10, ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/ETH-EUR/trades");

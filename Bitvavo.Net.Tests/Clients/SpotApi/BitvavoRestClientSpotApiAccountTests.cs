@@ -44,7 +44,7 @@ public class BitvavoRestClientSpotApiAccountTests
     {
         var account = AccountClientReturning("""{"fees":{"taker":"0.0025","maker":"0.0015","volume":"0"},"capabilities":["buy","sell"]}""", out var handler);
 
-        var result = await account.GetAccountInfoAsync();
+        var result = await account.GetAccountInfoAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests.Count.ShouldBe(1);
@@ -65,7 +65,7 @@ public class BitvavoRestClientSpotApiAccountTests
         """;
         var account = AccountClientReturning(json, out _);
 
-        var result = await account.GetAccountInfoAsync();
+        var result = await account.GetAccountInfoAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         result.Data.Fees.Taker.ShouldBe(0.0025m);
@@ -81,7 +81,7 @@ public class BitvavoRestClientSpotApiAccountTests
     {
         var account = AccountClientReturning("[]", out var handler);
 
-        var result = await account.GetBalancesAsync();
+        var result = await account.GetBalancesAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/balance");
@@ -93,7 +93,7 @@ public class BitvavoRestClientSpotApiAccountTests
     {
         var account = AccountClientReturning("[]", out var handler);
 
-        await account.GetBalancesAsync(symbol: "BTC");
+        await account.GetBalancesAsync(symbol: "BTC", ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/balance");
         handler.Requests[0].RequestUri!.Query.ShouldContain("symbol=BTC");
@@ -110,7 +110,7 @@ public class BitvavoRestClientSpotApiAccountTests
         """;
         var account = AccountClientReturning(json, out _);
 
-        var result = await account.GetBalancesAsync();
+        var result = await account.GetBalancesAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var list = result.Data.ToList();
@@ -130,7 +130,7 @@ public class BitvavoRestClientSpotApiAccountTests
     {
         var account = AccountClientReturning("""{"tier":"0","volume":"0","taker":"0.0025","maker":"0.0015"}""", out var handler);
 
-        var result = await account.GetTradingFeesAsync();
+        var result = await account.GetTradingFeesAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/account/fees");
@@ -142,7 +142,7 @@ public class BitvavoRestClientSpotApiAccountTests
     {
         var account = AccountClientReturning("""{"tier":"0","volume":"0","taker":"0.0025","maker":"0.0015"}""", out var handler);
 
-        await account.GetTradingFeesAsync(market: "ETH-EUR");
+        await account.GetTradingFeesAsync(market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.Query.ShouldContain("market=ETH-EUR");
     }
@@ -153,7 +153,7 @@ public class BitvavoRestClientSpotApiAccountTests
         const string json = """{ "tier": "2", "volume": "5000.5", "taker": "0.0020", "maker": "0.0010" }""";
         var account = AccountClientReturning(json, out _);
 
-        var result = await account.GetTradingFeesAsync();
+        var result = await account.GetTradingFeesAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         result.Data.Tier.ShouldBe("2");

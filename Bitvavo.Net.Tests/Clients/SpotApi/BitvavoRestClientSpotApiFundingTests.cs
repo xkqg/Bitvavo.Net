@@ -43,7 +43,7 @@ public class BitvavoRestClientSpotApiFundingTests
     {
         var funding = FundingClientReturning("""{"address":"bc1q...","paymentId":null}""", out var handler);
 
-        await funding.GetDepositAddressAsync("BTC");
+        await funding.GetDepositAddressAsync("BTC", ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].Method.ShouldBe(HttpMethod.Get);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/deposit");
@@ -56,7 +56,7 @@ public class BitvavoRestClientSpotApiFundingTests
     {
         var funding = FundingClientReturning("""{"address":"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh","paymentId":null}""", out _);
 
-        var result = await funding.GetDepositAddressAsync("BTC");
+        var result = await funding.GetDepositAddressAsync("BTC", ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         result.Data.Address.ShouldBe("bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh");
@@ -70,7 +70,7 @@ public class BitvavoRestClientSpotApiFundingTests
     {
         var funding = FundingClientReturning("""{"iban":"NL12BITV1234567890","bic":"BITVNL2A","paymentId":"REF-123"}""", out _);
 
-        var result = await funding.GetDepositAddressAsync("EUR");
+        var result = await funding.GetDepositAddressAsync("EUR", ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         result.Data.Iban.ShouldBe("NL12BITV1234567890");
@@ -88,7 +88,7 @@ public class BitvavoRestClientSpotApiFundingTests
         var start = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var end = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc);
 
-        await funding.GetDepositHistoryAsync(symbol: "EUR", limit: 50, startTime: start, endTime: end);
+        await funding.GetDepositHistoryAsync(symbol: "EUR", limit: 50, startTime: start, endTime: end, ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].Method.ShouldBe(HttpMethod.Get);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/depositHistory");
@@ -104,7 +104,7 @@ public class BitvavoRestClientSpotApiFundingTests
     {
         var funding = FundingClientReturning("[]", out var handler);
 
-        await funding.GetDepositHistoryAsync();
+        await funding.GetDepositHistoryAsync(ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.Query.ShouldBeEmpty();
     }
@@ -119,7 +119,7 @@ public class BitvavoRestClientSpotApiFundingTests
         """;
         var funding = FundingClientReturning(json, out _);
 
-        var result = await funding.GetDepositHistoryAsync();
+        var result = await funding.GetDepositHistoryAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var entries = result.Data.ToList();
@@ -140,7 +140,7 @@ public class BitvavoRestClientSpotApiFundingTests
         var funding = FundingClientReturning("[]", out var handler);
         var start = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        await funding.GetWithdrawalHistoryAsync(symbol: "BTC", limit: 25, startTime: start);
+        await funding.GetWithdrawalHistoryAsync(symbol: "BTC", limit: 25, startTime: start, ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].Method.ShouldBe(HttpMethod.Get);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/withdrawalHistory");
@@ -160,7 +160,7 @@ public class BitvavoRestClientSpotApiFundingTests
         """;
         var funding = FundingClientReturning(json, out _);
 
-        var result = await funding.GetWithdrawalHistoryAsync();
+        var result = await funding.GetWithdrawalHistoryAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var entries = result.Data.ToList();
@@ -179,13 +179,13 @@ public class BitvavoRestClientSpotApiFundingTests
         var funding = FundingClientReturning("""{"success":true,"symbol":"BTC","amount":"0.001"}""", out var handler);
 
         await funding.WithdrawAsync(new Bitvavo.Net.Objects.Models.Spot.BitvavoWithdrawRequest(
-            Symbol: "BTC", Amount: 0.001m, Address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"));
+            Symbol: "BTC", Amount: 0.001m, Address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"), ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].Method.ShouldBe(HttpMethod.Post);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/withdrawal");
         handler.Requests[0].Headers.GetValues("Bitvavo-Access-Signature").ShouldHaveSingleItem().Length.ShouldBe(64);
 
-        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
         body.ShouldContain("\"symbol\":\"BTC\"");
         body.ShouldContain("\"amount\":\"0.001\"");
         body.ShouldContain("\"address\":\"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh\"");
@@ -197,9 +197,9 @@ public class BitvavoRestClientSpotApiFundingTests
         var funding = FundingClientReturning("""{"success":true,"symbol":"XRP","amount":"50"}""", out var handler);
 
         await funding.WithdrawAsync(new Bitvavo.Net.Objects.Models.Spot.BitvavoWithdrawRequest(
-            Symbol: "XRP", Amount: 50m, Address: "rXY...", PaymentId: "12345", AddWithdrawalFee: true));
+            Symbol: "XRP", Amount: 50m, Address: "rXY...", PaymentId: "12345", AddWithdrawalFee: true), ct: TestContext.Current.CancellationToken);
 
-        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync(cancellationToken: TestContext.Current.CancellationToken);
         body.ShouldContain("\"paymentId\":\"12345\"");
         body.ShouldContain("\"addWithdrawalFee\":true");
     }
@@ -210,7 +210,7 @@ public class BitvavoRestClientSpotApiFundingTests
         var funding = FundingClientReturning("""{"success":true,"symbol":"BTC","amount":"0.0012"}""", out _);
 
         var result = await funding.WithdrawAsync(new Bitvavo.Net.Objects.Models.Spot.BitvavoWithdrawRequest(
-            Symbol: "BTC", Amount: 0.001m, Address: "bc1q..."));
+            Symbol: "BTC", Amount: 0.001m, Address: "bc1q..."), ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         result.Data.Success.ShouldBeTrue();

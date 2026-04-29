@@ -114,7 +114,7 @@ This library follows JKorf's exchange-client conventions exactly:
 
 - **Result type**: every public method returns `Task<WebCallResult<T>>` (or `Task<CallResult<UpdateSubscription>>` for sockets) — never throws on protocol errors.
 - **Options**: configure via `new BitvavoRestClient(opts => { opts.RequestTimeout = ...; })`.
-- **DI**: register via `services.AddBitvavo()` _(coming)_ — provides pooled `HttpClient` + scoped client lifetimes.
+- **DI**: register via `services.AddBitvavo()` — pooled `HttpClient`, transient REST client, singleton WebSocket client. Optional `Action<BitvavoRestOptions>` / `Action<BitvavoSocketOptions>` configurators.
 - **Naming**: `Bitvavo*RestClient*SpotApi*ExchangeData/Trading/Account` mirrors `Binance.Net` etc.
 
 ## Bitvavo API

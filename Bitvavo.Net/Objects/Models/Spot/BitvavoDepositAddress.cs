@@ -24,7 +24,11 @@ public record BitvavoDepositAddress
     [JsonPropertyName("bic")]
     public string? Bic { get; init; }
 
-    /// <summary>Description / memo / payment reference Bitvavo expects on the deposit so the funds attribute correctly.</summary>
+    /// <summary>Memo / payment reference Bitvavo expects on the deposit so the funds attribute correctly. Present for memo-required cryptos (e.g. XRP).</summary>
     [JsonPropertyName("paymentId")]
     public string? PaymentReference { get; init; }
+
+    /// <summary>Free-text description Bitvavo expects on a fiat (SEPA) transfer so the deposit attributes to the user's account.</summary>
+    [JsonPropertyName("description")]
+    public string? Description { get; init; }
 }

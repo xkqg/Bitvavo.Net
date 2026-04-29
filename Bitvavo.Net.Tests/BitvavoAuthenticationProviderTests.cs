@@ -81,7 +81,7 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        cfg.Headers.Count.ShouldBe(0);
+        cfg.Headers!.Count.ShouldBe(0);
         cfg.GetBodyContent().ShouldBeNull();
     }
 
@@ -93,11 +93,11 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        cfg.Headers.Keys.ShouldContain("Bitvavo-Access-Key");
-        cfg.Headers.Keys.ShouldContain("Bitvavo-Access-Signature");
-        cfg.Headers.Keys.ShouldContain("Bitvavo-Access-Timestamp");
-        cfg.Headers.Keys.ShouldContain("Bitvavo-Access-Window");
-        cfg.Headers["Bitvavo-Access-Key"].ShouldBe(TestKey);
+        cfg.Headers!.Keys.ShouldContain("Bitvavo-Access-Key");
+        cfg.Headers!.Keys.ShouldContain("Bitvavo-Access-Signature");
+        cfg.Headers!.Keys.ShouldContain("Bitvavo-Access-Timestamp");
+        cfg.Headers!.Keys.ShouldContain("Bitvavo-Access-Window");
+        cfg.Headers!["Bitvavo-Access-Key"].ShouldBe(TestKey);
     }
 
     [Fact]
@@ -108,7 +108,7 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        var sig = cfg.Headers["Bitvavo-Access-Signature"];
+        var sig = cfg.Headers!["Bitvavo-Access-Signature"];
         sig.Length.ShouldBe(64);
         sig.ShouldBe(sig.ToLowerInvariant());
         Regex.IsMatch(sig, "^[0-9a-f]{64}$").ShouldBeTrue();
@@ -120,12 +120,12 @@ public class BitvavoAuthenticationProviderTests
         var (p1, c1) = CreateProvider();
         var cfg1 = BuildConfig("v2/account", HttpMethod.Get, authenticated: true);
         p1.ProcessRequest(c1, cfg1);
-        cfg1.Headers["Bitvavo-Access-Window"].ShouldBe("10000");
+        cfg1.Headers!["Bitvavo-Access-Window"].ShouldBe("10000");
 
         var (p2, c2) = CreateProvider(receiveWindowMs: 60_000);
         var cfg2 = BuildConfig("v2/account", HttpMethod.Get, authenticated: true);
         p2.ProcessRequest(c2, cfg2);
-        cfg2.Headers["Bitvavo-Access-Window"].ShouldBe("60000");
+        cfg2.Headers!["Bitvavo-Access-Window"].ShouldBe("60000");
     }
 
     [Fact]
@@ -139,13 +139,13 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        var ts = cfg.Headers["Bitvavo-Access-Timestamp"];
+        var ts = cfg.Headers!["Bitvavo-Access-Timestamp"];
         var queryStr = cfg.GetQueryString(urlEncode: true);
         queryStr.ShouldNotBeNullOrEmpty();
         var expectedPayload = ts + "GET/v2/orders?" + queryStr;
         var expectedSig = HmacSha256Hex(TestSecret, expectedPayload);
 
-        cfg.Headers["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
+        cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        var ts = cfg.Headers["Bitvavo-Access-Timestamp"];
+        var ts = cfg.Headers!["Bitvavo-Access-Timestamp"];
         var pinnedBody = cfg.GetBodyContent();
         pinnedBody.ShouldNotBeNull();
         pinnedBody!.ShouldContain("\"market\":\"ETH-EUR\"");
@@ -171,7 +171,7 @@ public class BitvavoAuthenticationProviderTests
         var expectedPayload = ts + "POST/v2/order" + pinnedBody;
         var expectedSig = HmacSha256Hex(TestSecret, expectedPayload);
 
-        cfg.Headers["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
+        cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
     }
 
     [Fact]
@@ -186,11 +186,11 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        var ts = cfg.Headers["Bitvavo-Access-Timestamp"];
+        var ts = cfg.Headers!["Bitvavo-Access-Timestamp"];
         var expectedPayload = ts + "GET/v2/account";
         var expectedSig = HmacSha256Hex(TestSecret, expectedPayload);
 
-        cfg.Headers["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
+        cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
         cfg.GetBodyContent().ShouldBeNull();
     }
 
@@ -244,11 +244,11 @@ public class BitvavoAuthenticationProviderTests
 
         provider.ProcessRequest(apiClient, cfg);
 
-        var ts = cfg.Headers["Bitvavo-Access-Timestamp"];
+        var ts = cfg.Headers!["Bitvavo-Access-Timestamp"];
         var expectedPayload = ts + "DELETE/v2/order";
         var expectedSig = HmacSha256Hex(TestSecret, expectedPayload);
 
-        cfg.Headers["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
+        cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
         cfg.GetBodyContent().ShouldBeNull();
     }
 }

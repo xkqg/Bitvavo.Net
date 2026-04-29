@@ -12,6 +12,12 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// returns candles as positional arrays (<c>[ts_ms, open, high, low, close, volume]</c>),
 /// hence the <see cref="ArrayConverter{T}"/> mapping.
 /// </summary>
+/// <remarks>
+/// The mutable setters and parameterless ctor below are required by
+/// <see cref="ArrayConverter{T}"/>: the converter constructs the record then assigns each
+/// <see cref="ArrayPropertyAttribute"/>-tagged member by index. Init-only properties or a
+/// positional-record syntax would not work here.
+/// </remarks>
 [JsonConverter(typeof(ArrayConverter<BitvavoKline>))]
 public record BitvavoKline
 {

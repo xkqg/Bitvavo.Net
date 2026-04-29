@@ -102,10 +102,10 @@ internal sealed class BitvavoAccountSubscription<T> : Subscription
         _markets = markets;
 
         IndividualSubscriptionCount = markets.Length;
-        // Bitvavo doesn't tag account events with a per-market topic in a way the framework
-        // can hash on — every event already contains the market in its body. Filter purely
-        // by event-type (typeIdentifier).
-        MessageRouter = MessageRouter.CreateWithoutTopicFilter<T>(typeIdentifier, DoHandleMessage);
+        // Per-market routing: the message handler extracts each event's market via
+        // AddTopicMapping<T>(x => x.Market); this subscription declares the market set it
+        // wants, so two disjoint subscriptions never see each other's events.
+        MessageRouter = MessageRouter.CreateWithTopicFilters<T>(typeIdentifier, _markets, DoHandleMessage);
     }
 
     protected override CryptoExchange.Net.Sockets.Query? GetSubQuery(SocketConnection connection) =>

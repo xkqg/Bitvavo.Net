@@ -30,7 +30,8 @@ public class BitvavoCredentials : ApiCredentials
     }
 
     /// <inheritdoc />
-    public override ApiCredentials Copy() => new BitvavoCredentials { Spot = Spot };
+    public override ApiCredentials Copy() =>
+        new BitvavoCredentials { Spot = Spot is null ? null : new HMACCredential(Spot.Key, Spot.Secret) };
 
     /// <inheritdoc />
     public override void Validate() => Spot?.Validate();

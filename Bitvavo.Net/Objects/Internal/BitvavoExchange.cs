@@ -26,11 +26,19 @@ internal static class BitvavoExchange
 }
 
 /// <summary>
-/// Bitvavo error mappings consumed by the message handler. v0.1 ships an empty mapping
-/// (Bitvavo's <c>{ "errorCode": int, "error": "msg" }</c> envelope is parsed generically);
-/// later releases will populate per-code <see cref="ErrorInfo"/> entries.
+/// Bitvavo error mappings consumed by the REST + WebSocket message handlers. The Bitvavo
+/// error envelope shape is uniform — <c>{ "errorCode": int, "error": "msg" }</c> — so the
+/// generic handler can parse every response without per-code metadata; this static class
+/// is the seam for populating <see cref="ErrorInfo"/> entries (e.g. <c>IsTransient</c>,
+/// <see cref="ErrorType"/>) per-code as the table is built up.
 /// </summary>
 internal static class BitvavoErrors
 {
+    /// <summary>
+    /// Spot-API error mapping. v0.3 ships empty: every server error funnels through
+    /// <see cref="ErrorMapping.GetErrorInfo(string, string)"/> which returns
+    /// <see cref="ErrorInfo.Unknown"/> for missing codes — perfectly safe, just less
+    /// granular for retry/transient classification. Populate per-code entries before v1.0.
+    /// </summary>
     public static readonly ErrorMapping SpotMapping = new(System.Array.Empty<ErrorInfo>(), System.Array.Empty<ErrorEvaluator>());
 }

@@ -12,9 +12,11 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// <param name="Address">Destination wallet address (crypto) or IBAN (fiat). Required.</param>
 /// <param name="PaymentId">Memo / payment reference for assets that require it (e.g. XRP destination tag).</param>
 /// <param name="AddWithdrawalFee">If true, fee is added on top of <paramref name="Amount"/> (caller is debited <c>Amount + fee</c>); if false or omitted, fee is deducted from <paramref name="Amount"/>.</param>
+/// <param name="Internal">If true, transfer between Bitvavo accounts (no on-chain / fiat-rail movement, no fee). Used for inter-account moves.</param>
 public record BitvavoWithdrawRequest(
     string Symbol,
     decimal Amount,
     string Address,
     string? PaymentId = null,
-    bool? AddWithdrawalFee = null);
+    bool? AddWithdrawalFee = null,
+    bool? Internal = null);

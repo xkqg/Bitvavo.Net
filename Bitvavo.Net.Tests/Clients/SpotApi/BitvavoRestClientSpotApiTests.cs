@@ -44,7 +44,7 @@ public class BitvavoRestClientSpotApiTests
     {
         var client = ClientReturning("""{"fees":{"taker":"0.0025","maker":"0.0015","volume":"0"},"capabilities":["view"]}""", out var handler);
 
-        var result = await client.SpotApi.Account.GetAccountInfoAsync();
+        var result = await client.SpotApi.Account.GetAccountInfoAsync(ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         handler.Requests.Count.ShouldBe(1);

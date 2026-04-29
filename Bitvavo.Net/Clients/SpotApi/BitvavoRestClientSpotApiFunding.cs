@@ -77,6 +77,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
         body.Add("address", request.Address);
         body.AddOptional("paymentId", request.PaymentId);
         body.AddOptional("addWithdrawalFee", request.AddWithdrawalFee);
+        body.AddOptional("internal", request.Internal);
 
         var def = _definitions.GetOrCreate(HttpMethod.Post, "v2/withdrawal", true);
         return _baseClient.SendAsync<BitvavoWithdrawalResult>(def, queryParameters: null, bodyParameters: body, ct);

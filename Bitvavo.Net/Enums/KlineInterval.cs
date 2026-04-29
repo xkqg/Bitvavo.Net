@@ -2,6 +2,7 @@
 
 using System.Text.Json.Serialization;
 using CryptoExchange.Net.Attributes;
+using CryptoExchange.Net.Converters.SystemTextJson;
 
 namespace Bitvavo.Net.Enums;
 
@@ -10,7 +11,7 @@ namespace Bitvavo.Net.Enums;
 /// REST endpoint and the <c>candles</c> WebSocket channel. Wire format matches Bitvavo's
 /// documented strings (e.g. <c>"1m"</c>, <c>"1h"</c>, <c>"1d"</c>).
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(EnumConverter<KlineInterval>))]
 public enum KlineInterval
 {
     /// <summary>1 minute.</summary>
@@ -35,4 +36,8 @@ public enum KlineInterval
     [Map("12h")] TwelveHours,
     /// <summary>1 day.</summary>
     [Map("1d")] OneDay,
+    /// <summary>1 week.</summary>
+    [Map("1w")] OneWeek,
+    /// <summary>1 month. Wire token is capital <c>"1M"</c> (lowercase <c>"1m"</c> means one minute).</summary>
+    [Map("1M")] OneMonth,
 }

@@ -19,7 +19,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <summary>
     /// Get all spot markets supported by Bitvavo.
     /// <para>
-    /// <a href="https://docs.bitvavo.com/#tag/General/paths/~1markets/get">Bitvavo API docs</a>
+    /// <a href="https://docs.bitvavo.com/docs/rest-api/get-markets">Bitvavo API docs</a>
     /// </para>
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
@@ -28,7 +28,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <summary>
     /// Get historical candles (klines) for a given market and interval.
     /// <para>
-    /// <a href="https://docs.bitvavo.com/#tag/Market-Data/paths/~1{market}~1candles/get">Bitvavo API docs</a>
+    /// <a href="https://docs.bitvavo.com/docs/rest-api/get-candles">Bitvavo API docs</a>
     /// </para>
     /// </summary>
     /// <param name="market">Market identifier, e.g. <c>"ETH-EUR"</c>.</param>
