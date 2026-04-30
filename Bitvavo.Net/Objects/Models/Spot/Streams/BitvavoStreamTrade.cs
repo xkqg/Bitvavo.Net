@@ -3,6 +3,7 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Bitvavo.Net.Enums;
 using CryptoExchange.Net.Converters.SystemTextJson;
 
 namespace Bitvavo.Net.Objects.Models.Spot.Streams;
@@ -38,7 +39,7 @@ public record BitvavoStreamTrade
     [JsonPropertyName("price")]
     public decimal Price { get; init; }
 
-    /// <summary>Aggressor side: <c>"buy"</c> or <c>"sell"</c>.</summary>
+    /// <summary>Aggressor side. Wire form is <c>"buy"</c> / <c>"sell"</c>; deserialised via <c>EnumConverter</c> on <see cref="OrderSide"/>.</summary>
     [JsonPropertyName("side")]
-    public string Side { get; init; } = string.Empty;
+    public OrderSide Side { get; init; }
 }
