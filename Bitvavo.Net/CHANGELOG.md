@@ -10,8 +10,9 @@ All notable changes to **Bitvavo.Net** are documented here. The format follows
 - `services.AddBitvavo()` DI extension (transient `IBitvavoRestClient`, singleton
   `IBitvavoSocketClient`, optional `Action<BitvavoRestOptions>` /
   `Action<BitvavoSocketOptions>` configurators).
-- `KlineInterval.OneWeek` (`"1w"`) and `KlineInterval.OneMonth` (`"1M"`) — Bitvavo wire
-  tokens; capital `M` distinguishes "one month" from `"1m"` ("one minute").
+- `KlineInterval.OneWeek` (`"1W"`) and `KlineInterval.OneMonth` (`"1M"`) — Bitvavo wire
+  tokens; capital letters distinguish these from minute (`"1m"`) and the initial erroneous
+  `"1w"` that shipped with the first preview.
 - `BitvavoWithdrawRequest.Internal` — opt-in flag for inter-account Bitvavo transfers
   (no on-chain / fiat-rail movement, no fee).
 - `BitvavoDepositAddress.Description` — fiat (SEPA) deposit description, distinct from
