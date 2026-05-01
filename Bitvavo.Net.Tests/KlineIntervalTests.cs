@@ -15,16 +15,17 @@ namespace Bitvavo.Net.Tests;
 /// <see cref="System.Text.Json.Serialization.JsonStringEnumConverter"/> with
 /// <see cref="EnumConverter{T}"/> for [Map]-driven wire symmetry).
 ///
-/// Bitvavo wire format note: candle intervals use lowercase letters except <c>"1M"</c>
-/// (capital M = month) which differs from <c>"1m"</c> (lowercase = one minute). The
+/// Bitvavo wire format note: minute/hour/day intervals are lowercase, but <c>"1W"</c>
+/// (week) and <c>"1M"</c> (month) are capital — capital <c>M</c> is needed to disambiguate
+/// from <c>"1m"</c> (one minute), and the docs use the same convention for week. The
 /// test pins both so a future copy-paste typo is caught immediately.
 /// </summary>
 public class KlineIntervalTests
 {
     [Fact]
-    public void OneWeek_GetString_returns_1w()
+    public void OneWeek_GetString_returns_1W()
     {
-        EnumConverter.GetString(KlineInterval.OneWeek).ShouldBe("1w");
+        EnumConverter.GetString(KlineInterval.OneWeek).ShouldBe("1W");
     }
 
     [Fact]
@@ -45,7 +46,7 @@ public class KlineIntervalTests
     [InlineData("8h",  KlineInterval.EightHours)]
     [InlineData("12h", KlineInterval.TwelveHours)]
     [InlineData("1d",  KlineInterval.OneDay)]
-    [InlineData("1w",  KlineInterval.OneWeek)]
+    [InlineData("1W",  KlineInterval.OneWeek)]
     [InlineData("1M",  KlineInterval.OneMonth)]
     public void GetString_matches_BitvavoWireFormat(string wire, KlineInterval interval)
     {
@@ -53,7 +54,7 @@ public class KlineIntervalTests
     }
 
     [Theory]
-    [InlineData("1w",  KlineInterval.OneWeek)]
+    [InlineData("1W",  KlineInterval.OneWeek)]
     [InlineData("1M",  KlineInterval.OneMonth)]
     public void ParseString_recovers_NewIntervals(string wire, KlineInterval expected)
     {
@@ -78,7 +79,7 @@ public class KlineIntervalTests
     [Theory]
     [InlineData(KlineInterval.OneHour,   "\"1h\"")]
     [InlineData(KlineInterval.OneDay,    "\"1d\"")]
-    [InlineData(KlineInterval.OneWeek,   "\"1w\"")]
+    [InlineData(KlineInterval.OneWeek,   "\"1W\"")]
     [InlineData(KlineInterval.OneMonth,  "\"1M\"")]
     public void Serialize_via_JsonSerializer_emits_wireToken(KlineInterval value, string expectedJson)
     {
@@ -89,7 +90,7 @@ public class KlineIntervalTests
     [Theory]
     [InlineData("\"1h\"", KlineInterval.OneHour)]
     [InlineData("\"1d\"", KlineInterval.OneDay)]
-    [InlineData("\"1w\"", KlineInterval.OneWeek)]
+    [InlineData("\"1W\"", KlineInterval.OneWeek)]
     [InlineData("\"1M\"", KlineInterval.OneMonth)]
     public void Deserialize_via_JsonSerializer_recovers_enum(string json, KlineInterval expected)
     {

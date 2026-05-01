@@ -36,8 +36,8 @@ public enum KlineInterval
     [Map("12h")] TwelveHours = 9,
     /// <summary>1 day.</summary>
     [Map("1d")] OneDay = 10,
-    /// <summary>1 week.</summary>
-    [Map("1w")] OneWeek = 11,
+    /// <summary>1 week. Wire token is capital <c>"1W"</c> per Bitvavo's documented set.</summary>
+    [Map("1W")] OneWeek = 11,
     /// <summary>1 month. Wire token is capital <c>"1M"</c> (lowercase <c>"1m"</c> means one minute).</summary>
     [Map("1M")] OneMonth = 12,
 }
