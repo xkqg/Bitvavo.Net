@@ -1,6 +1,8 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Bitvavo.Net.Enums;
@@ -70,6 +72,34 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
             {
                 Name = "trades",
                 Markets = new[] { market },
+            },
+            handler: (receiveTime, originalData, message) =>
+                onMessage(new DataEvent<BitvavoStreamTrade>(
+                    BitvavoExchange.ExchangeName,
+                    message,
+                    receiveTime,
+                    originalData)
+                    .WithSymbol(message.Market)
+                    .WithStreamId("trades")));
+
+        return _client.SubscribeInternalAsync(_client.BaseAddress, subscription, ct);
+    }
+
+    /// <inheritdoc />
+    public Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+        IEnumerable<string> markets,
+        Action<DataEvent<BitvavoStreamTrade>> onMessage,
+        CancellationToken ct = default)
+    {
+        var marketArray = markets.ToArray();
+        var subscription = new BitvavoSubscription<BitvavoStreamTrade>(
+            _logger,
+            typeIdentifier: "trade",
+            topics: marketArray,
+            channel: new BitvavoSocketChannel
+            {
+                Name = "trades",
+                Markets = marketArray,
             },
             handler: (receiveTime, originalData, message) =>
                 onMessage(new DataEvent<BitvavoStreamTrade>(

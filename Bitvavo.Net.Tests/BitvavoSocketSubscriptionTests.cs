@@ -69,6 +69,24 @@ public class BitvavoSocketSubscriptionTests
             name: "Concurrent");
     }
 
+    [Fact]
+    public async Task SubscribeToTradeUpdatesAsync_MultiMarket_sends_canonical_envelope_and_dispatches_trade_event()
+    {
+        var loggerFactory = new LoggerFactory();
+        var client = new BitvavoSocketClient(loggerFactory, Options.Create(new BitvavoSocketOptions()));
+
+        var validator = new SocketSubscriptionValidator<BitvavoSocketClient>(
+            client,
+            folder: "Subscriptions/Spot/ExchangeData",
+            baseAddress: "wss://ws.bitvavo.com",
+            nestedPropertyForCompare: null);
+
+        await validator.ValidateAsync<BitvavoStreamTrade>(
+            (c, handler) => c.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync(
+                new[] { "BTC-EUR", "ETH-EUR" }, handler),
+            name: "SubscribeToTradeUpdatesMultiMarket");
+    }
+
     // Auth-WebSocket fixture-based integration tests are deferred — the
     // SocketSubscriptionValidator matches outgoing JSON literally, but the auth message
     // contains a real-time timestamp + per-call HMAC signature that can't be pinned without

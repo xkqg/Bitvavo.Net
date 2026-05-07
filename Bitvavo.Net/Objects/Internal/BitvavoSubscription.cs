@@ -35,6 +35,26 @@ internal sealed class BitvavoSubscription<T> : Subscription
         MessageRouter = MessageRouter.CreateWithTopicFilter<T>(typeIdentifier, topic, DoHandleMessage);
     }
 
+    /// <summary>
+    /// Multi-topic variant: routes events whose topic matches any value in
+    /// <paramref name="topics"/> to this subscription's handler. Use for set-based
+    /// subscriptions where one <see cref="BitvavoSubscription{T}"/> covers multiple markets.
+    /// </summary>
+    public BitvavoSubscription(
+        ILogger logger,
+        string typeIdentifier,
+        string[] topics,
+        BitvavoSocketChannel channel,
+        Action<DateTime, string?, T> handler)
+        : base(logger, authenticated: false)
+    {
+        _handler = handler;
+        _channel = channel;
+
+        IndividualSubscriptionCount = channel.Markets.Length;
+        MessageRouter = MessageRouter.CreateWithTopicFilters<T>(typeIdentifier, topics, DoHandleMessage);
+    }
+
     protected override Query? GetSubQuery(SocketConnection connection) =>
         new BitvavoSubscribeQuery(new BitvavoSocketRequest
         {

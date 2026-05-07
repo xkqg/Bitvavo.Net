@@ -1,6 +1,7 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Bitvavo.Net.Enums;
@@ -45,6 +46,23 @@ public interface IBitvavoSocketClientSpotApiExchangeData
     /// <param name="ct">Cancellation token used to close this subscription.</param>
     Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
         string market,
+        Action<DataEvent<BitvavoStreamTrade>> onMessage,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Subscribe to public trade updates for multiple markets with a single WebSocket
+    /// subscription. The <see cref="DataEvent{T}.Data"/>.<c>Market</c> field identifies
+    /// which market each event belongs to. Prefer this over calling the single-market
+    /// overload per pair to reduce connection overhead.
+    /// <para>
+    /// <a href="https://docs.bitvavo.com/docs/websocket-overview/">Bitvavo WS docs</a>
+    /// </para>
+    /// </summary>
+    /// <param name="markets">Market identifiers, e.g. <c>["BTC-EUR", "ETH-EUR"]</c>.</param>
+    /// <param name="onMessage">Handler invoked for each public trade event; dispatch by <c>Data.Market</c>.</param>
+    /// <param name="ct">Cancellation token used to close this subscription.</param>
+    Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+        IEnumerable<string> markets,
         Action<DataEvent<BitvavoStreamTrade>> onMessage,
         CancellationToken ct = default);
 }
