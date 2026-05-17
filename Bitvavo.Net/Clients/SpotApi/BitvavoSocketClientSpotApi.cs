@@ -71,7 +71,7 @@ internal sealed partial class BitvavoSocketClientSpotApi : SocketApiClient<Bitva
     /// </summary>
     internal System.Threading.Tasks.Task<CryptoExchange.Net.Objects.CallResult<CryptoExchange.Net.Objects.Sockets.UpdateSubscription>> SubscribeInternalAsync(
         string url,
-        CryptoExchange.Net.Sockets.Default.Subscription subscription,
-        System.Threading.CancellationToken ct)
+        Subscription subscription,
+        CancellationToken ct)
         => SubscribeAsync(url, subscription, ct);
 }

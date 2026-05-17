@@ -126,14 +126,14 @@ internal sealed class BitvavoAccountSubscription<T> : Subscription
         new BitvavoSubscribeQuery(new BitvavoSocketRequest
         {
             Action = "unsubscribe",
-            Channels = new[]
-            {
+            Channels =
+            [
                 new BitvavoSocketChannel
                 {
                     Name = "account",
                     Markets = _markets,
-                },
-            },
+                }
+            ],
         });
 
     public CallResult DoHandleMessage(SocketConnection connection, DateTime receiveTime, string? originalData, T message)

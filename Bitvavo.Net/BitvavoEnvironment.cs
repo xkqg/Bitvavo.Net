@@ -40,7 +40,7 @@ public class BitvavoEnvironment : TradeEnvironment
         TradeEnvironmentNames.Live => Live,
         "" => Live,
         null => Live,
-        _ => default,
+        _ => null,
     };
 
     /// <summary>Available environment names.</summary>

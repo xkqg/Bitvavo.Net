@@ -49,7 +49,8 @@ internal sealed class BitvavoRestSpotMessageHandler : JsonRestMessageHandler
         var code = document.RootElement.TryGetProperty("errorCode", out var c) ? c.GetInt32().ToString() : null;
         var msg  = document.RootElement.TryGetProperty("error",     out var m) ? m.GetString()        : null;
 
-        if (code == null) return new ServerError(ErrorInfo.Unknown);
-        return new ServerError(code, _errorMapping.GetErrorInfo(code, msg));
+        return code == null 
+            ? new ServerError(ErrorInfo.Unknown) 
+            : new ServerError(code, _errorMapping.GetErrorInfo(code, msg));
     }
 }

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace Bitvavo.Net.Clients;
 
 /// <inheritdoc cref="IBitvavoSocketClient" />
-public class BitvavoSocketClient : BaseSocketClient<BitvavoEnvironment, BitvavoCredentials>, IBitvavoSocketClient
+public sealed class BitvavoSocketClient : BaseSocketClient<BitvavoEnvironment, BitvavoCredentials>, IBitvavoSocketClient
 {
     /// <inheritdoc />
     public IBitvavoSocketClientSpotApi SpotApi { get; }

@@ -43,8 +43,8 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
             channel: new BitvavoSocketChannel
             {
                 Name = "candles",
-                Interval = new[] { intervalWire },
-                Markets = new[] { market },
+                Interval = [intervalWire],
+                Markets = [market],
             },
             handler: (receiveTime, originalData, message) =>
                 onMessage(new DataEvent<BitvavoStreamCandleEvent>(
@@ -71,7 +71,7 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
             channel: new BitvavoSocketChannel
             {
                 Name = "trades",
-                Markets = new[] { market },
+                Markets = [market],
             },
             handler: (receiveTime, originalData, message) =>
                 onMessage(new DataEvent<BitvavoStreamTrade>(

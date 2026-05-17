@@ -25,9 +25,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
     /// <inheritdoc />
     public Task<WebCallResult<BitvavoDepositAddress>> GetDepositAddressAsync(string symbol, CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.Add("symbol", symbol);
-
+        var parameters = new ParameterCollection { { "symbol", symbol } };
         var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/deposit", true);
         return _baseClient.SendAsync<BitvavoDepositAddress>(def, parameters, ct);
     }

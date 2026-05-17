@@ -37,7 +37,7 @@ internal sealed class BitvavoSocketSpotMessageHandler : JsonSocketMessageHandler
     {
         new MessageTypeDefinition
         {
-            Fields = new[] { new PropertyFieldReference("event") },
+            Fields = [new PropertyFieldReference("event")],
             TypeIdentifierCallback = x => x.FieldValue("event")!,
         },
     };

@@ -85,7 +85,8 @@ internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironmen
         => new(credentials, ClientOptions.ReceiveWindowMs);
 
     /// <inheritdoc />
-    protected override IMessageSerializer CreateSerializer() => new SystemTextJsonMessageSerializer(new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    protected override IMessageSerializer CreateSerializer() 
+        => new SystemTextJsonMessageSerializer(new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
     /// <summary>
     /// Internal SendAsync wrapper — fills the Bitvavo Spot REST base address so call sites in the *Data partials stay terse.

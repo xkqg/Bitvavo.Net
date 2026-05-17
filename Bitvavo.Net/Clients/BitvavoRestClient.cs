@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace Bitvavo.Net.Clients;
 
 /// <inheritdoc cref="IBitvavoRestClient" />
-public class BitvavoRestClient : BaseRestClient<BitvavoEnvironment, BitvavoCredentials>, IBitvavoRestClient
+public sealed class BitvavoRestClient : BaseRestClient<BitvavoEnvironment, BitvavoCredentials>, IBitvavoRestClient
 {
     /// <inheritdoc />
     public IBitvavoRestClientSpotApi SpotApi { get; }
