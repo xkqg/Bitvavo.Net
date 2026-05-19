@@ -36,4 +36,15 @@ public interface IBitvavoRestClientSpotApiAccount
     /// <param name="market">Optional market identifier (e.g. <c>"ETH-EUR"</c>) to scope the fee response.</param>
     /// <param name="ct">Cancellation token.</param>
     Task<WebCallResult<BitvavoMarketFee>> GetTradingFeesAsync(string? market = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Set or refresh the server-side cancel-on-disconnect deadline for orders tagged with
+    /// <paramref name="codGroupId"/>. The Bitvavo broker cancels every open order in the group
+    /// when no further <c>POST /v2/cancelOrdersAfter</c> lands before
+    /// <paramref name="expiryAfterSeconds"/>. Fase 1 dead-man-switch primitive — replaces an
+    /// ill-conceived per-order REST-polling bandaid that the entry-council M7 inspector verified
+    /// is not a real Bitvavo endpoint.
+    /// </summary>
+    Task<WebCallResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
+        string codGroupId, int expiryAfterSeconds, CancellationToken ct = default);
 }

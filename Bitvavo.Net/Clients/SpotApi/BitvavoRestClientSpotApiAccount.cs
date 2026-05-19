@@ -47,4 +47,15 @@ internal sealed class BitvavoRestClientSpotApiAccount : IBitvavoRestClientSpotAp
         var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/account/fees", true);
         return _baseClient.SendAsync<BitvavoMarketFee>(request, parameters, ct);
     }
+
+    /// <inheritdoc />
+    public Task<WebCallResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
+        string codGroupId, int expiryAfterSeconds, CancellationToken ct = default)
+    {
+        var parameters = new ParameterCollection();
+        parameters.Add("codGroupId", codGroupId);
+        parameters.Add("expiryAfterSeconds", expiryAfterSeconds);
+        var request = _definitions.GetOrCreate(HttpMethod.Post, "v2/cancelOrdersAfter", true);
+        return _baseClient.SendAsync<BitvavoCancelOrdersAfter>(request, parameters, ct);
+    }
 }
