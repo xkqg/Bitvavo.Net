@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj" />
+  <Project Path="Bitvavo.Net/Bitvavo.Net.csproj" />
+</Solution>

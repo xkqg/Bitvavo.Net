@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Bitvavo.Net\Bitvavo.Net.csproj" />
+    <ProjectReference Include="..\Bitvavo.Net\Bitvavo.Net.csproj" />
   </ItemGroup>
 
 </Project>
