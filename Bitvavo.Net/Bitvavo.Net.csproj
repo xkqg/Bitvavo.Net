@@ -15,8 +15,8 @@
     <Authors>H.P. Gansevoort</Authors>
     <Description>A .NET client library for the Bitvavo REST and WebSocket APIs, built on the CryptoExchange.Net base library — strongly typed models, automatic WebSocket reconnection, client-side rate limiting, and seamless integration with other CryptoExchange.Net based clients (Binance.Net, Kraken.Net, etc.).</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/JKorf/Bitvavo.Net</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/JKorf/Bitvavo.Net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/xkqg/Bitvavo.Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/xkqg/Bitvavo.Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>Bitvavo Bitvavo.Net Bitvavo Client Bitvavo API CryptoCurrency CryptoCurrency Exchange CryptoExchange.Net</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
