@@ -64,7 +64,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         body.AddOptional("postOnly", request.PostOnly);
         body.AddOptional("responseRequired", request.ResponseRequired);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Put, "v2/order", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Put, "v2/order", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoOrder>(def, queryParameters: null, bodyParameters: body, ct);
     }
 
@@ -76,7 +76,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         parameters.AddOptional("orderId", orderId);
         parameters.AddOptional("clientOrderId", clientOrderId);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/order", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/order", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoOrder>(def, parameters, ct);
     }
 
@@ -91,17 +91,19 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
 
         // Bitvavo signs path + query for DELETE (never body for non-POST/PUT), so parameters
         // must land in the URI — see RequestDefinitionCacheExtensions.GetOrCreateInUri.
-        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/order", true);
+        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/order", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoOrderId>(def, parameters, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(string? market = null, CancellationToken ct = default)
+    public Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(long operatorId, string? market = null, CancellationToken ct = default)
     {
         var parameters = new ParameterCollection();
+        parameters.Add("operatorId", operatorId);
         parameters.AddOptional("market", market);
 
-        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/orders", true);
+        // v2/orders DELETE: weight=100 when cancelling all (no market filter), weight=25 otherwise.
+        var def = _definitions.GetOrCreateInUri(HttpMethod.Delete, "v2/orders", BitvavoRestClientSpotApi.RateLimitGate, weight: market is null ? 100 : 25, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoOrderId>>(def, parameters, ct);
     }
 
@@ -112,7 +114,8 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         parameters.AddOptional("market", market);
         parameters.AddOptional("base", baseAsset);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/ordersOpen", true);
+        // v2/ordersOpen: weight=100 when no market filter (returns all), weight=5 otherwise.
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/ordersOpen", BitvavoRestClientSpotApi.RateLimitGate, weight: market is null ? 100 : 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoOrder>>(def, parameters, ct);
     }
 
@@ -134,7 +137,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         parameters.AddOptional("orderIdFrom", orderIdFrom);
         parameters.AddOptional("orderIdTo", orderIdTo);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/orders", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/orders", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoOrder>>(def, parameters, ct);
     }
 
@@ -156,7 +159,7 @@ internal sealed class BitvavoRestClientSpotApiTrading : IBitvavoRestClientSpotAp
         parameters.AddOptional("tradeIdFrom", tradeIdFrom);
         parameters.AddOptional("tradeIdTo", tradeIdTo);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/trades", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/trades", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoFill>>(def, parameters, ct);
     }
 }

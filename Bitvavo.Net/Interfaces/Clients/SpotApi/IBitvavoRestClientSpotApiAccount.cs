@@ -1,5 +1,6 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,7 +45,37 @@ public interface IBitvavoRestClientSpotApiAccount
     /// <paramref name="expiryAfterSeconds"/>. Fase 1 dead-man-switch primitive — replaces an
     /// ill-conceived per-order REST-polling bandaid that the entry-council M7 inspector verified
     /// is not a real Bitvavo endpoint.
+    /// <para><a href="https://docs.bitvavo.com/docs/cancel-on-disconnect">Bitvavo API docs</a></para>
     /// </summary>
+    /// <param name="codGroupId">Numeric cancel-on-disconnect group identifier.</param>
+    /// <param name="expiryAfterSeconds">Seconds until the broker cancels the group (minimum 10; 0 removes the group).</param>
+    /// <param name="ct">Cancellation token.</param>
     Task<WebCallResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
-        string codGroupId, int expiryAfterSeconds, CancellationToken ct = default);
+        int codGroupId, int expiryAfterSeconds, CancellationToken ct = default);
+
+    /// <summary>
+    /// Get the account transaction history (the account ledger) — trades, deposits,
+    /// withdrawals, staking rewards, affiliate payouts, internal transfers, rebates, and
+    /// more. Results are paginated by page number; walk
+    /// <see cref="BitvavoTransactionHistory.CurrentPage"/> / <see cref="BitvavoTransactionHistory.TotalPages"/>.
+    /// <para><a href="https://docs.bitvavo.com/docs/rest-api/get-transaction-history">Bitvavo API docs</a></para>
+    /// </summary>
+    /// <param name="fromDate">Inclusive UTC lower bound on transaction execution time.</param>
+    /// <param name="toDate">Inclusive UTC upper bound on transaction execution time.</param>
+    /// <param name="page">One-based page number to return (default 1).</param>
+    /// <param name="maxItems">Maximum number of items per page (1–100, default 100).</param>
+    /// <param name="type">
+    /// Optional transaction-type filter — one of <c>sell</c>, <c>buy</c>, <c>staking</c>,
+    /// <c>fixed_staking</c>, <c>deposit</c>, <c>withdrawal</c>, <c>affiliate</c>,
+    /// <c>distribution</c>, <c>internal_transfer</c>, <c>withdrawal_cancelled</c>,
+    /// <c>rebate</c>, <c>loan</c>, <c>external_transferred_funds</c>, <c>manually_assigned</c>.
+    /// </param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<WebCallResult<BitvavoTransactionHistory>> GetTransactionHistoryAsync(
+        DateTime? fromDate = null,
+        DateTime? toDate = null,
+        int? page = null,
+        int? maxItems = null,
+        string? type = null,
+        CancellationToken ct = default);
 }

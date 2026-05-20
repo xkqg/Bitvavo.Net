@@ -58,9 +58,10 @@ public interface IBitvavoRestClientSpotApiTrading
     /// Cancel all open orders, optionally scoped to a single market.
     /// <para><a href="https://docs.bitvavo.com/docs/rest-api/cancel-orders">Bitvavo API docs</a></para>
     /// </summary>
+    /// <param name="operatorId">Account-scoped originator id. Required by Bitvavo on every order operation (mandatory since API v2.9.0).</param>
     /// <param name="market">Optional market to scope the cancellation. Null cancels every open order on the account.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(string? market = null, CancellationToken ct = default);
+    Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(long operatorId, string? market = null, CancellationToken ct = default);
 
     /// <summary>
     /// List open orders.

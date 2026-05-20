@@ -10,11 +10,11 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// </summary>
 public sealed record BitvavoCancelOrdersAfter
 {
-    /// <summary>Group identifier echoed back by the broker.</summary>
+    /// <summary>Numeric group identifier echoed back by the broker.</summary>
     [JsonPropertyName("codGroupId")]
-    public string CodGroupId { get; init; } = string.Empty;
+    public int CodGroupId { get; init; }
 
-    /// <summary>Unix-ms deadline at which the broker cancels every order in the group.</summary>
-    [JsonPropertyName("expiresAt")]
-    public long ExpiresAt { get; init; }
+    /// <summary>Unix-SECONDS deadline at which the broker cancels every open order in the group.</summary>
+    [JsonPropertyName("timeOfExpirySeconds")]
+    public long TimeOfExpirySeconds { get; init; }
 }

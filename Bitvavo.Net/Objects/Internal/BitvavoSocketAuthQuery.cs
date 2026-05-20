@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using CryptoExchange.Net.Objects;
+using CryptoExchange.Net.Objects.Errors;
 using CryptoExchange.Net.Sockets;
 using CryptoExchange.Net.Sockets.Default;
 using CryptoExchange.Net.Sockets.Default.Routing;
@@ -25,11 +26,29 @@ internal sealed class BitvavoSocketAuthQuery : Query<BitvavoSocketAuthResponse>
             HandleAuthResponse);
     }
 
+    // A CryptoExchange.Net Query route-handler is TERMINAL: it processes the routed message,
+    // returns a CallResult, and the framework's Query machinery completes the pending query
+    // from that return value. It must NEVER call Query.Handle — that is the router-dispatch
+    // entry point, so re-entering it from inside a route handler re-routes the same message
+    // straight back here and recurses until StackOverflowException.
     private CallResult HandleAuthResponse(SocketConnection connection, System.DateTime receiveTime, string? originalData, BitvavoSocketAuthResponse message)
-    {
-        // Forward to the base Query<T>.Handle so the framework's wait-handle / completion
-        // plumbing fires (it returns bool — we ignore it; the route succeeds either way).
-        Handle("authenticate", string.Empty, connection, receiveTime, originalData ?? string.Empty, message);
-        return CallResult.SuccessResult;
-    }
+        => EvaluateAuthResponse(message);
+
+    /// <summary>
+    /// Maps a parsed Bitvavo <c>authenticate</c> reply onto the query's terminal
+    /// <see cref="CallResult"/>: success when the server confirms
+    /// <see cref="BitvavoSocketAuthResponse.Authenticated"/>, otherwise a failed result
+    /// carrying a <see cref="ServerError"/> of <see cref="ErrorType.Unauthorized"/> so the
+    /// socket surfaces the rejection instead of proceeding unauthenticated.
+    /// </summary>
+    /// <param name="message">The deserialised <c>{ "event": "authenticate", "authenticated": &lt;bool&gt; }</c> reply.</param>
+    /// <returns>
+    /// <see cref="CallResult.SuccessResult"/> when <paramref name="message"/> reports
+    /// <see cref="BitvavoSocketAuthResponse.Authenticated"/> = <see langword="true"/>;
+    /// a failed <see cref="CallResult"/> carrying an <see cref="ServerError"/> otherwise.
+    /// </returns>
+    internal static CallResult EvaluateAuthResponse(BitvavoSocketAuthResponse message)
+        => message.Authenticated
+            ? CallResult.SuccessResult
+            : new CallResult(new ServerError(new ErrorInfo(ErrorType.Unauthorized, "Bitvavo WebSocket authentication was rejected by the server")));
 }

@@ -6,12 +6,18 @@ using CryptoExchange.Net.SharedApis;
 namespace Bitvavo.Net.Objects.Internal;
 
 /// <summary>
-/// Bitvavo exchange-wide constants + symbol-formatting helper. Mirrors KrakenExchange's
-/// shape — referenced by client classes (<see cref="Clients.SpotApi.BitvavoRestClientSpotApi.FormatSymbol"/>).
+/// Bitvavo exchange-wide constants + symbol-formatting helper. Mirrors <c>KrakenExchange</c>'s
+/// shape — referenced by client classes (<see cref="Clients.SpotApi.BitvavoRestClientSpotApi.FormatSymbol"/>)
+/// and by the CryptoExchange.Net Shared-API implementations as the canonical
+/// <see cref="CryptoExchange.Net.SharedApis.ISharedClient.Exchange"/> identifier.
 /// </summary>
-internal static class BitvavoExchange
+public static class BitvavoExchange
 {
-    /// <summary>Display name used by CryptoExchange.Net for logging + tracking.</summary>
+    /// <summary>
+    /// Exchange identifier used by CryptoExchange.Net for logging, tracking, and as the
+    /// <see cref="CryptoExchange.Net.SharedApis.ISharedClient.Exchange"/> value. Mirrors
+    /// <c>KrakenExchange.ExchangeName</c> / <c>BinanceExchange.ExchangeName</c>.
+    /// </summary>
     public const string ExchangeName = "Bitvavo";
 
     /// <summary>Bitvavo public-tier weight budget per minute (per source IP). 1000 weight/min.</summary>

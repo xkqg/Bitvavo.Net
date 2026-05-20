@@ -60,9 +60,9 @@ public record BitvavoFill
     [JsonPropertyName("fee"), JsonConverter(typeof(DecimalConverter))]
     public decimal? Fee { get; init; }
 
-    /// <summary>Currency the fee was paid in (e.g. <c>"EUR"</c>).</summary>
+    /// <summary>Currency the fee was paid in (e.g. <c>"EUR"</c>). Omitted by Bitvavo when <see cref="Settled"/> is false.</summary>
     [JsonPropertyName("feeCurrency")]
-    public string FeeCurrency { get; init; } = string.Empty;
+    public string? FeeCurrency { get; init; }
 
     /// <summary>True once the fill is fully settled on Bitvavo's books.</summary>
     [JsonPropertyName("settled")]

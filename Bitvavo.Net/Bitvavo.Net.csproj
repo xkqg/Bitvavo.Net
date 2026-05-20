@@ -10,7 +10,11 @@
 
     <!-- NuGet metadata — JKorf-conform, handoff-ready -->
     <PackageId>Bitvavo.Net</PackageId>
+    <!-- PackageVersion explicitly overrides the Base Directory.Build.props <PackageVersion>1.0.0</PackageVersion>:
+         Bitvavo.Net versions INDEPENDENTLY of the Ait.Infrastructure 1.0.0 bundle (Fase 1 council M2).
+         Once extracted to its own repo this override is no longer needed. -->
     <Version>0.3.0-preview</Version>
+    <PackageVersion>0.3.0-preview</PackageVersion>
     <Authors>H.P. Gansevoort</Authors>
     <Description>A .NET client library for the Bitvavo REST and WebSocket APIs, built on the CryptoExchange.Net base library — strongly typed models, automatic WebSocket reconnection, client-side rate limiting, and seamless integration with other CryptoExchange.Net based clients (Binance.Net, Kraken.Net, etc.).</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -19,7 +23,9 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>Bitvavo Bitvavo.Net Bitvavo Client Bitvavo API CryptoCurrency CryptoCurrency Exchange CryptoExchange.Net</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <!-- PackageIcon intentionally omitted for v0.3.0-preview — add a 128x128 PNG before JKorf submission. -->
+    <!-- 128x128 PNG rasterised from the official Bitvavo rounded-square mark (blue #0051ff)
+         downloaded from bitvavo.com/en/press. icon.svg is kept alongside as the source asset. -->
+    <PackageIcon>icon.png</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -32,6 +38,7 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="CHANGELOG.md" Pack="true" PackagePath="\" />
+    <None Include="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Examples is a separate project tree (Examples/QuickStart/QuickStart.csproj); exclude

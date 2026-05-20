@@ -1,8 +1,16 @@
 # Bitvavo.Net
 
+[![NuGet version](https://img.shields.io/nuget/v/Bitvavo.Net?style=for-the-badge)](https://www.nuget.org/packages/Bitvavo.Net) [![NuGet downloads](https://img.shields.io/nuget/dt/Bitvavo.Net?style=for-the-badge)](https://www.nuget.org/packages/Bitvavo.Net) ![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)
+
+> The NuGet badges show "not found" until the first package publish — that is expected for this pre-release.
+
 A high-performance .NET client library for the [Bitvavo](https://bitvavo.com) REST and WebSocket APIs, built on the [CryptoExchange.Net](https://github.com/JKorf/CryptoExchange.Net) base library.
 
 This package is a community contribution, intended for adoption into the JKorf exchange-clients ecosystem alongside `Binance.Net`, `Kraken.Net`, `Bybit.Net`, etc. — same API patterns, same `WebCallResult<T>` discipline, same options shape, same DI extension surface.
+
+The package targets `net8.0;net9.0;net10.0` and is built on `CryptoExchange.Net 11.1.1`.
+
+For information on the clients, dependency injection, response processing, and the shared interfaces, see the [CryptoExchange.Net documentation](https://cryptoexchange.jkorf.dev).
 
 ## Status
 
@@ -12,6 +20,34 @@ This package is a community contribution, intended for adoption into the JKorf e
 - ✅ Public WebSocket: candles + trades subscriptions
 - ✅ Signed REST (HMAC-SHA256) — Account (info / balances / fees), Trading (place / update / get / cancel / batch-cancel / open / history / fills), Funding (deposit address + history, withdrawal history, **withdraw POST**)
 - ✅ Authenticated WebSocket: private `account` channel — subscribe to order-state + fill events
+
+## Supported features
+
+### Spot REST
+|API|Supported|Location|
+|--|--:|--|
+|Public market data|✅|`restClient.SpotApi.ExchangeData`|
+|Account|✅|`restClient.SpotApi.Account`|
+|Trading|✅|`restClient.SpotApi.Trading`|
+|Funding|✅|`restClient.SpotApi.Account`|
+|Report (MiCA)|✅|`restClient.SpotApi.Report`|
+|Institutional / subaccounts|✅|`restClient.SpotApi.Institutional`|
+
+### Spot WebSocket
+|API|Supported|Location|
+|--|--:|--|
+|Public streams|✅|`socketClient.SpotApi.ExchangeData`|
+|Private account channel|✅|`socketClient.SpotApi.Account`|
+
+### CryptoExchange.Net Shared interfaces
+|API|Supported|Location|
+|--|--:|--|
+|Shared REST interfaces|✅|`restClient.SpotApi.SharedClient`|
+|Shared socket interfaces|✅|`socketClient.SpotApi.SharedClient`|
+
+The package implements the full CryptoExchange.Net Shared-interface layer — 14 REST
+shared interfaces and 4 socket shared interfaces — so Bitvavo can be driven through
+the same exchange-agnostic abstractions as every other CryptoExchange.Net client.
 
 ## Install
 

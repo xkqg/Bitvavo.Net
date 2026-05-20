@@ -16,4 +16,11 @@ public interface IBitvavoSocketClientSpotApi : ISocketApiClient
 
     /// <summary>Signed private-stream subscriptions on the <c>account</c> channel — order-state + fill events.</summary>
     IBitvavoSocketClientSpotApiAccount Account { get; }
+
+    /// <summary>
+    /// The exchange-agnostic CryptoExchange.Net Shared-API surface for Bitvavo Spot
+    /// WebSocket. Use this to program against the Shared abstractions common to every
+    /// CryptoExchange.Net client library (mirrors <c>IKrakenSocketClientSpotApi.SharedClient</c>).
+    /// </summary>
+    IBitvavoSocketClientSpotApiShared SharedClient { get; }
 }

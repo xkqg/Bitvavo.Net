@@ -6,6 +6,67 @@ All notable changes to **Bitvavo.Net** are documented here. The format follows
 
 ## [Unreleased] — council fixes (post-13b1397)
 
+### Added — P1 endpoint completeness
+- `IBitvavoRestClientSpotApiAccount.GetTransactionHistoryAsync` — `GET /v2/account/history`
+  (account ledger; Bitvavo API v2.5.0). Page-number pagination via the new
+  `BitvavoTransactionHistory` / `BitvavoTransactionHistoryEntry` records.
+- New `Report` sub-client (`IBitvavoRestClientSpotApiReport`) — MiCA regulatory reporting
+  (Bitvavo API v2.9.0): `GetTradesReportAsync` (`GET /v2/report/{market}/trades`) and
+  `GetBookReportAsync` (`GET /v2/report/{market}/book`). New records `BitvavoTradesReport`,
+  `BitvavoBookReport`, `BitvavoBookReportEntry`.
+- New `Institutional` sub-client (`IBitvavoRestClientSpotApiInstitutional`) — all 10
+  institutional endpoints (Bitvavo API 2026-03-23): create / list subaccounts, create /
+  get / list transfers, per-subaccount balance / transaction history / open orders, and
+  subaccount single / bulk order cancellation. New records `BitvavoSubaccount`,
+  `BitvavoSubaccountList`, `BitvavoSubaccountTransfer`, `BitvavoSubaccountTransferList`,
+  `BitvavoSubaccountBalances`, `BitvavoCreateTransferRequest`,
+  `BitvavoSubaccountCancelOrderRequest`; new enum `SubaccountTransferDirection`.
+- 27 new test cases across `BitvavoRestClientSpotApiAccountTests`,
+  `BitvavoRestClientSpotApiReportTests`, `BitvavoRestClientSpotApiInstitutionalTests`.
+
+### Changed — P1-bis rate-limit gate coverage
+- Every authenticated + public REST endpoint now passes through the per-host
+  `RateLimitGate` (900 weight/min sliding, undercutting Bitvavo's 1000/min by a
+  100-weight safety margin) with the Bitvavo-documented per-endpoint weight
+  (most = 1; `balance` / `trades` / `*History` / report-trades = 5; `cancelOrders`
+  & `ordersOpen` without a market filter = 100). Previously only 4 of 38 endpoints
+  were gated.
+- `RequestDefinitionCacheExtensions.GetOrCreateInUri` gained a gate-aware overload
+  so the in-URI `DELETE` endpoints (`cancel-order`, `cancel-orders`) are gated too.
+- `ResetCancelOnDisconnectAsync` (`POST /v2/cancelOrdersAfter`) is intentionally
+  **left ungated** — the cancel-on-disconnect heartbeat must never be client-side
+  rate-limited; its weight is absorbed by the safety margin.
+- New package-icon: the official Bitvavo rounded-square mark (`icon.png`, 128×128).
+
+### Added — P2 CryptoExchange.Net Shared-interface layer
+- `BitvavoRestClientSpotApi` now implements the CryptoExchange.Net Shared REST
+  interfaces — 14 in total: `IAssetsRestClient`, `IKlineRestClient`,
+  `IRecentTradeRestClient`, `IOrderBookRestClient`, `ISpotSymbolRestClient`,
+  `ISpotTickerRestClient`, `IBookTickerRestClient`, `IBalanceRestClient`,
+  `ISpotOrderRestClient`, `ISpotOrderClientIdRestClient`, `IFeeRestClient`,
+  `IDepositRestClient`, `IWithdrawalRestClient`, `IWithdrawRestClient`. New
+  `IBitvavoRestClientSpotApiShared` facade interface and partial implementation
+  `BitvavoRestClientSpotApi.Shared.cs`.
+- `BitvavoSocketClientSpotApi` now implements the CryptoExchange.Net Shared socket
+  interfaces — 4 in total: `IKlineSocketClient`, `ITradeSocketClient`,
+  `ISpotOrderSocketClient`, `IUserTradeSocketClient`. New
+  `IBitvavoSocketClientSpotApiShared` facade interface and partial implementation
+  `BitvavoSocketClientSpotApi.Shared.cs`. The account-channel market set is supplied
+  through the `ExchangeParameters` `Markets` escape hatch, since the Shared
+  `SubscribeSpotOrderRequest` / `SubscribeUserTradeRequest` types carry no symbol set.
+- The Shared layer lets Bitvavo be driven through the same exchange-agnostic
+  abstractions as every other CryptoExchange.Net client (`Binance.Net`, `Kraken.Net`,
+  etc.) without exchange-specific code at the call site.
+
+### Changed — P1 endpoint completeness
+- **Breaking:** `IBitvavoRestClientSpotApiTrading.CancelOrdersAsync` now takes a required
+  leading `long operatorId` parameter — Bitvavo made `operatorId` mandatory on bulk-cancel
+  (API v2.9.0). New signature: `CancelOrdersAsync(long operatorId, string? market = null,
+  CancellationToken ct = default)`.
+- **Breaking:** `codGroupId` is now typed as `int` (was `string`) — Bitvavo's API models it
+  as a number. Affects `BitvavoCancelOrdersAfter.CodGroupId` and the
+  `IBitvavoRestClientSpotApiAccount.ResetCancelOnDisconnectAsync` parameter.
+
 ### Added
 - `services.AddBitvavo()` DI extension (transient `IBitvavoRestClient`, singleton
   `IBitvavoSocketClient`, optional `Action<BitvavoRestOptions>` /

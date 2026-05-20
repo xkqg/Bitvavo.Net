@@ -26,7 +26,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
     public Task<WebCallResult<BitvavoDepositAddress>> GetDepositAddressAsync(string symbol, CancellationToken ct = default)
     {
         var parameters = new ParameterCollection { { "symbol", symbol } };
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/deposit", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/deposit", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoDepositAddress>(def, parameters, ct);
     }
 
@@ -44,7 +44,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
         parameters.AddOptionalMilliseconds("start", startTime);
         parameters.AddOptionalMilliseconds("end", endTime);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/depositHistory", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/depositHistory", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoDepositHistoryEntry>>(def, parameters, ct);
     }
 
@@ -62,7 +62,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
         parameters.AddOptionalMilliseconds("start", startTime);
         parameters.AddOptionalMilliseconds("end", endTime);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/withdrawalHistory", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, "v2/withdrawalHistory", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoWithdrawalHistoryEntry>>(def, parameters, ct);
     }
 
@@ -77,7 +77,7 @@ internal sealed class BitvavoRestClientSpotApiFunding : IBitvavoRestClientSpotAp
         body.AddOptional("addWithdrawalFee", request.AddWithdrawalFee);
         body.AddOptional("internal", request.Internal);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Post, "v2/withdrawal", true);
+        var def = _definitions.GetOrCreate(HttpMethod.Post, "v2/withdrawal", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoWithdrawalResult>(def, queryParameters: null, bodyParameters: body, ct);
     }
 }

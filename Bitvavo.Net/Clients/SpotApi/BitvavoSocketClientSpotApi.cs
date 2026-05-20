@@ -33,6 +33,14 @@ internal sealed partial class BitvavoSocketClientSpotApi : SocketApiClient<Bitva
     /// <inheritdoc />
     public IBitvavoSocketClientSpotApiAccount Account { get; }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The Shared-API surface is implemented directly on this class (see the
+    /// <c>BitvavoSocketClientSpotApi.Shared.cs</c> facade-hosted partial), so the accessor
+    /// returns <c>this</c>.
+    /// </remarks>
+    public IBitvavoSocketClientSpotApiShared SharedClient => this;
+
     internal BitvavoSocketClientSpotApi(ILogger logger, BitvavoSocketOptions options)
         : base(logger, options.Environment.SpotSocketPublicAddress, options, options.SpotOptions)
     {

@@ -98,9 +98,9 @@ public record BitvavoStreamOrderUpdate
     [JsonPropertyName("selfTradePrevention")]
     public SelfTradePrevention? SelfTradePrevention { get; init; }
 
-    /// <summary>Visible portion of an iceberg order.</summary>
+    /// <summary>True when the order id is visible in the public order book for the market.</summary>
     [JsonPropertyName("visible")]
-    public decimal? Visible { get; init; }
+    public bool? Visible { get; init; }
 
     /// <summary>Total base-asset quantity filled so far.</summary>
     [JsonPropertyName("filledAmount")]

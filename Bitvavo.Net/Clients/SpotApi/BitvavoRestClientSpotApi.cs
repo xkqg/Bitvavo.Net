@@ -24,7 +24,13 @@ using Microsoft.Extensions.Logging;
 namespace Bitvavo.Net.Clients.SpotApi;
 
 /// <inheritdoc cref="IBitvavoRestClientSpotApi" />
-internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironment, BitvavoAuthenticationProvider, BitvavoCredentials>, IBitvavoRestClientSpotApi
+/// <remarks>
+/// The CryptoExchange.Net Shared-API surface is implemented in the facade-hosted partial
+/// <c>BitvavoRestClientSpotApi.Shared.cs</c> — <c>sealed</c> is dropped here only so the
+/// partial can be split across files (the type is still non-extensible: <c>internal</c>
+/// with no derived types). Mirrors <c>KrakenRestClientSpotApi</c>.
+/// </remarks>
+internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironment, BitvavoAuthenticationProvider, BitvavoCredentials>, IBitvavoRestClientSpotApi
 {
     /// <summary>
     /// Per-host weight gate — Bitvavo enforces <see cref="BitvavoExchange.WeightPerMinute"/>
@@ -64,6 +70,20 @@ internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironmen
     /// <inheritdoc />
     public IBitvavoRestClientSpotApiFunding Funding { get; }
 
+    /// <inheritdoc />
+    public IBitvavoRestClientSpotApiReport Report { get; }
+
+    /// <inheritdoc />
+    public IBitvavoRestClientSpotApiInstitutional Institutional { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The Shared-API surface is implemented directly on this class (see the
+    /// <c>BitvavoRestClientSpotApi.Shared.cs</c> facade-hosted partial), so the accessor
+    /// returns <c>this</c>.
+    /// </remarks>
+    public IBitvavoRestClientSpotApiShared SharedClient => this;
+
     /// <summary>Display name of the exchange — used by CryptoExchange.Net diagnostics.</summary>
     public string ExchangeName => BitvavoExchange.ExchangeName;
 
@@ -74,6 +94,8 @@ internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironmen
         Account = new BitvavoRestClientSpotApiAccount(this);
         Trading = new BitvavoRestClientSpotApiTrading(this);
         Funding = new BitvavoRestClientSpotApiFunding(this);
+        Report = new BitvavoRestClientSpotApiReport(this);
+        Institutional = new BitvavoRestClientSpotApiInstitutional(this);
     }
 
     /// <inheritdoc />

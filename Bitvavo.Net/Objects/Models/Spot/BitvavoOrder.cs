@@ -99,9 +99,9 @@ public record BitvavoOrder
     [JsonPropertyName("selfTradePrevention")]
     public SelfTradePrevention? SelfTradePrevention { get; init; }
 
-    /// <summary>Visible portion of an iceberg order.</summary>
-    [JsonPropertyName("visible"), JsonConverter(typeof(DecimalConverter))]
-    public decimal? Visible { get; init; }
+    /// <summary>True when the order id is visible in the public order book for the market.</summary>
+    [JsonPropertyName("visible")]
+    public bool? Visible { get; init; }
 
     /// <summary>Trigger amount for stop / take-profit orders.</summary>
     [JsonPropertyName("triggerAmount"), JsonConverter(typeof(DecimalConverter))]

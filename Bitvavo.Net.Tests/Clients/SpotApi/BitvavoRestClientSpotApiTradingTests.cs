@@ -131,6 +131,24 @@ public class BitvavoRestClientSpotApiTradingTests
         result.Data.Fills[0].Amount.ShouldBe(0.5m);
     }
 
+    [Fact]
+    public async Task PlaceOrderAsync_maps_visible_boolean_field()
+    {
+        // Regression: Bitvavo's order-response `visible` is a JSON boolean. The SDK mistyped it
+        // as decimal? → System.Text.Json threw DeserializationFailed on EVERY HTTP 200 order
+        // response — surfaced by the €5 LIVE smoke. Fixture uses the real boolean wire shape.
+        var trading = TradingClientReturning(
+            """{"orderId":"v-1","market":"ETH-EUR","status":"filled","side":"buy","orderType":"market","created":0,"updated":0,"visible":false}""",
+            out _);
+
+        var result = await trading.PlaceOrderAsync(
+            new BitvavoPlaceOrderRequest("ETH-EUR", OrderSide.Buy, OrderType.Market, OperatorId: 1, AmountQuote: 5m),
+            ct: TestContext.Current.CancellationToken);
+
+        result.Success.ShouldBeTrue();
+        result.Data.Visible.ShouldBe(false);
+    }
+
     // ── CancelOrderAsync ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -205,25 +223,27 @@ public class BitvavoRestClientSpotApiTradingTests
     // ── CancelOrdersAsync (batch) ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task CancelOrdersAsync_no_market_cancels_all_with_no_query()
+    public async Task CancelOrdersAsync_no_market_cancels_all_with_only_operatorId_query()
     {
         var trading = TradingClientReturning("[]", out var handler);
 
-        await trading.CancelOrdersAsync(ct: TestContext.Current.CancellationToken);
+        await trading.CancelOrdersAsync(operatorId: 11, ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].Method.ShouldBe(HttpMethod.Delete);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/orders");
-        handler.Requests[0].RequestUri!.Query.ShouldBeEmpty();
+        handler.Requests[0].RequestUri!.Query.ShouldContain("operatorId=11");
+        handler.Requests[0].RequestUri!.Query.ShouldNotContain("market=");
     }
 
     [Fact]
-    public async Task CancelOrdersAsync_with_market_passes_market_query()
+    public async Task CancelOrdersAsync_with_market_passes_market_and_operatorId_query()
     {
         var trading = TradingClientReturning("[]", out var handler);
 
-        await trading.CancelOrdersAsync(market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
+        await trading.CancelOrdersAsync(operatorId: 22, market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
 
         handler.Requests[0].RequestUri!.Query.ShouldContain("market=ETH-EUR");
+        handler.Requests[0].RequestUri!.Query.ShouldContain("operatorId=22");
     }
 
     [Fact]
@@ -231,7 +251,7 @@ public class BitvavoRestClientSpotApiTradingTests
     {
         var trading = TradingClientReturning("""[{"orderId":"a","market":"ETH-EUR"},{"orderId":"b","market":"ETH-EUR"}]""", out _);
 
-        var result = await trading.CancelOrdersAsync(market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
+        var result = await trading.CancelOrdersAsync(operatorId: 1, market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
 
         result.Success.ShouldBeTrue();
         var ids = result.Data.ToList();
@@ -358,6 +378,27 @@ public class BitvavoRestClientSpotApiTradingTests
         fills[0].Price.ShouldBe(3000m);
         fills[0].Taker.ShouldBe(true);
         fills[0].Settled.ShouldBe(true);
+    }
+
+    [Fact]
+    public async Task GetUserTradesAsync_fillWithoutFeeCurrency_yieldsNull()
+    {
+        // Bitvavo omits feeCurrency (and fee) when settled=false. FeeCurrency is string? so an
+        // unsettled fill yields null — a true sentinel, consistent with the nullable Fee — not
+        // an empty-string that a caller cannot distinguish from a real currency.
+        const string json = """
+        [ { "id":"t1", "orderId":"o1", "timestamp":1717200000000, "market":"ETH-EUR", "side":"buy",
+            "amount":"0.5", "price":"3000", "taker":true, "settled":false } ]
+        """;
+        var trading = TradingClientReturning(json, out _);
+
+        var result = await trading.GetUserTradesAsync(market: "ETH-EUR", ct: TestContext.Current.CancellationToken);
+
+        result.Success.ShouldBeTrue();
+        var fills = result.Data.ToList();
+        fills[0].FeeCurrency.ShouldBeNull();
+        fills[0].Fee.ShouldBeNull();
+        fills[0].Settled.ShouldBe(false);
     }
 
     // ── UpdateOrderAsync ──────────────────────────────────────────────────────────────────
