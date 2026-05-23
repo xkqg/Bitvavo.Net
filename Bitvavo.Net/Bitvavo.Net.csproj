@@ -24,8 +24,9 @@
          downloaded from bitvavo.com/en/press. icon.svg is kept alongside as the source asset. -->
     <PackageIcon>icon.png</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- DebugType=embedded (Directory.Build.props) bakes symbols into the assembly,
+         so no separate .snupkg is needed (and pushing an empty .snupkg fails with
+         HTTP 400 "The package does not contain any symbol (.pdb) files"). -->
   </PropertyGroup>
 
   <ItemGroup>
