@@ -1,0 +1,37 @@
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+
+# Opt JS actions into Node 24 ahead of the Sept 2026 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'preview'
+
+      - name: Restore
+        run: dotnet restore Bitvavo.Net.slnx
+
+      - name: Build
+        run: dotnet build Bitvavo.Net.slnx --no-restore --configuration Release -warnaserror
+
+      - name: Test
+        run: dotnet run --project Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj --no-build --configuration Release
+
+      - name: Pack
+        run: dotnet pack Bitvavo.Net/Bitvavo.Net.csproj --no-build --configuration Release --output nupkgs
+
+      - name: Push to NuGet
+        run: dotnet nuget push "nupkgs/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

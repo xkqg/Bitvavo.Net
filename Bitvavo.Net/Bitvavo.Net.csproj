@@ -10,8 +10,8 @@
 
     <!-- NuGet metadata — JKorf-conform, handoff-ready -->
     <PackageId>Bitvavo.Net</PackageId>
-    <!-- Preview track until the first JKorf release. -->
-    <Version>0.3.0-preview</Version>
+    <!-- Pre-1.0 track until the first JKorf release (0.x = API may change without warning per SemVer). -->
+    <Version>0.4.0</Version>
     <Authors>H.P. Gansevoort</Authors>
     <Description>A .NET client library for the Bitvavo REST and WebSocket APIs, built on the CryptoExchange.Net base library — strongly typed models, automatic WebSocket reconnection, client-side rate limiting, and seamless integration with other CryptoExchange.Net based clients (Binance.Net, Kraken.Net, etc.).</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
