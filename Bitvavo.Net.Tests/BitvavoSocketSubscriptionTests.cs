@@ -1,22 +1,60 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Bitvavo.Net.Clients;
 using Bitvavo.Net.Enums;
 using Bitvavo.Net.Objects.Models.Spot.Streams;
 using Bitvavo.Net.Objects.Options;
+using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Testing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Shouldly;
 using Xunit;
 
 namespace Bitvavo.Net.Tests;
 
-
-
-
+/// <summary>
+/// Public-stream subscriptions through the framework's own test transport: the canonical subscribe envelope, event dispatch
+/// per topic, and the lifetime of a subscription (a cancellation token closes it).
+/// </summary>
 public class BitvavoSocketSubscriptionTests
 {
+    /// <summary>
+    /// Bitvavo acknowledges a subscribe with no per-request reply, so a subscribe counts as done once it is sent. The
+    /// subscription must then be <c>Subscribed</c> — only a subscribed subscription registers its cancellation token — and
+    /// cancelling the token the caller passed in must close it again.
+    /// </summary>
+    [Fact]
+    public async Task Subscribe_then_cancel_token_closes_the_subscription()
+    {
+        var client = new BitvavoSocketClient(new LoggerFactory(), Options.Create(new BitvavoSocketOptions()));
+        TestHelpers.ConfigureSocketClient(client, "wss://ws.bitvavo.com/v2/");
+        using var cts = new CancellationTokenSource();
+
+        var result = await client.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync("ETH-EUR", _ => { }, cts.Token);
+
+        result.Success.ShouldBeTrue();
+        result.Data.SubscriptionStatus.ShouldBe(SubscriptionStatus.Subscribed);
+        client.SpotApi.CurrentSubscriptions.ShouldBe(1);
+
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        result.Data.SubscriptionStatusChanged += status =>
+        {
+            if (status == SubscriptionStatus.Closed)
+            {
+                closed.TrySetResult();
+            }
+        };
+
+        cts.Cancel();
+
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        client.SpotApi.CurrentSubscriptions.ShouldBe(0);
+    }
+
     [Fact]
     public async Task SubscribeToKlineUpdatesAsync_sends_canonical_envelope_and_dispatches_candle_event()
     {
@@ -26,7 +64,7 @@ public class BitvavoSocketSubscriptionTests
         var validator = new SocketSubscriptionValidator<BitvavoSocketClient>(
             client,
             folder: "Subscriptions/Spot/ExchangeData",
-            baseAddress: "wss://ws.bitvavo.com",
+            baseAddress: "wss://ws.bitvavo.com/v2/",
             nestedPropertyForCompare: null);
 
         await validator.ValidateAsync<BitvavoStreamCandleEvent>(
@@ -43,7 +81,7 @@ public class BitvavoSocketSubscriptionTests
         var validator = new SocketSubscriptionValidator<BitvavoSocketClient>(
             client,
             folder: "Subscriptions/Spot/ExchangeData",
-            baseAddress: "wss://ws.bitvavo.com",
+            baseAddress: "wss://ws.bitvavo.com/v2/",
             nestedPropertyForCompare: null);
 
         await validator.ValidateAsync<BitvavoStreamTrade>(
@@ -60,7 +98,7 @@ public class BitvavoSocketSubscriptionTests
         var validator = new SocketSubscriptionValidator<BitvavoSocketClient>(
             client,
             folder: "Subscriptions/Spot/ExchangeData",
-            baseAddress: "wss://ws.bitvavo.com",
+            baseAddress: "wss://ws.bitvavo.com/v2/",
             nestedPropertyForCompare: null);
 
         await validator.ValidateConcurrentAsync<BitvavoStreamCandleEvent>(
@@ -78,7 +116,7 @@ public class BitvavoSocketSubscriptionTests
         var validator = new SocketSubscriptionValidator<BitvavoSocketClient>(
             client,
             folder: "Subscriptions/Spot/ExchangeData",
-            baseAddress: "wss://ws.bitvavo.com",
+            baseAddress: "wss://ws.bitvavo.com/v2/",
             nestedPropertyForCompare: null);
 
         await validator.ValidateAsync<BitvavoStreamTrade>(
@@ -87,13 +125,10 @@ public class BitvavoSocketSubscriptionTests
             name: "SubscribeToTradeUpdatesMultiMarket");
     }
 
-    // Auth-WebSocket fixture-based integration tests are deferred — the
-    // SocketSubscriptionValidator matches outgoing JSON literally, but the auth message
-    // contains a real-time timestamp + per-call HMAC signature that can't be pinned without
-    // a clock-injection refactor of the framework's AuthenticationProvider. Auth-WS is
-    // covered by:
-    //   1. BitvavoAuthenticationProviderTests.BuildSocketAuth_* (3 unit tests, green).
-    //   2. BitvavoSmoke --signed-ws live smoke (manual; requires real creds).
-    // Fixtures at Subscriptions/Spot/Account/SubscribeTo{Order,Fill}Updates.txt document
-    // the expected wire shape for future validator-based tests once placeholder support lands.
+    // The private account channel is not validator-tested: the SocketSubscriptionValidator matches outgoing JSON literally,
+    // while the authenticate frame carries a real-time timestamp and a per-call HMAC signature. It is covered by:
+    //   1. BitvavoAuthenticationProviderTests.BuildSocketAuth_* + Socket_auth_timestamp_uses_the_time_offset (the signer),
+    //   2. BitvavoSocketAccountDispatchTests (authenticate -> subscribe -> order/fill events through the framework),
+    //   3. the env-gated live smoke (INTEGRATION=1; needs real credentials).
+    // Fixtures at Subscriptions/Spot/Account/SubscribeTo{Order,Fill}Updates.txt document the expected wire shape.
 }

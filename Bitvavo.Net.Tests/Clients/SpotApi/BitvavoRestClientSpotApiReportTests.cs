@@ -16,25 +16,41 @@ namespace Bitvavo.Net.Tests.Clients.SpotApi;
 
 /// <summary>
 /// Unit tests for <see cref="BitvavoRestClientSpotApiReport"/> — covers the two MiCA
-/// regulatory-reporting endpoints (trades report, order-book report). Verifies path,
-/// method, signed headers, query shape, and DTO mapping.
+/// regulatory-reporting endpoints (trades report, order-book report). Both are public
+/// endpoints in Bitvavo's documentation: they are sent unsigned and work without
+/// credentials. Verifies path, method, query shape, and DTO mapping.
 /// </summary>
 public class BitvavoRestClientSpotApiReportTests
 {
     private static BitvavoRestClientSpotApiReport ReportClientReturning(
         string json,
         out StubHttpMessageHandler handler,
-        HttpStatusCode status = HttpStatusCode.OK)
+        HttpStatusCode status = HttpStatusCode.OK,
+        bool withCredentials = true)
     {
         handler = new StubHttpMessageHandler(json, status);
         var http = new HttpClient(handler);
-        var opts = new BitvavoRestOptions
+        var opts = new BitvavoRestOptions();
+        if (withCredentials)
         {
-            ApiCredentials = new BitvavoCredentials("test-key", "test-secret"),
-        };
+            opts.ApiCredentials = new BitvavoCredentials("test-key", "test-secret");
+        }
+
         var client = new BitvavoRestClient(http, null, Options.Create(opts));
         var apiClient = (BitvavoRestClientSpotApi)client.SpotApi;
         return new BitvavoRestClientSpotApiReport(apiClient);
+    }
+
+    // ── public endpoints ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Report_endpoints_work_without_credentials()
+    {
+        var trades = ReportClientReturning("[]", out _, withCredentials: false);
+        var book = ReportClientReturning("""{"submissionTimestamp":0,"assetCode":"BTC","assetName":"Bitcoin","priceCurrency":"EUR","priceNotation":"MONE","quantityCurrency":"BTC","quantityNotation":"CRYP","venue":"VAVO","tradingSystem":"VAVO","publicationTimestamp":0,"bids":[],"asks":[]}""", out _, withCredentials: false);
+
+        (await trades.GetTradesReportAsync("BTC-EUR", ct: TestContext.Current.CancellationToken)).Success.ShouldBeTrue();
+        (await book.GetBookReportAsync("BTC-EUR", ct: TestContext.Current.CancellationToken)).Success.ShouldBeTrue();
     }
 
     // ── GetTradesReportAsync ──────────────────────────────────────────────────────────────
@@ -56,7 +72,7 @@ public class BitvavoRestClientSpotApiReportTests
         q.ShouldContain("end=1717243200000");
         q.ShouldContain("tradeIdFrom=tf-1");
         q.ShouldContain("tradeIdTo=tt-1");
-        handler.Requests[0].Headers.GetValues("Bitvavo-Access-Signature").ShouldHaveSingleItem().Length.ShouldBe(64);
+        handler.Requests[0].Headers.Contains("Bitvavo-Access-Signature").ShouldBeFalse();
     }
 
     [Fact]
@@ -114,7 +130,7 @@ public class BitvavoRestClientSpotApiReportTests
         handler.Requests[0].Method.ShouldBe(HttpMethod.Get);
         handler.Requests[0].RequestUri!.AbsolutePath.ShouldBe("/v2/report/BTC-EUR/book");
         handler.Requests[0].RequestUri!.Query.ShouldContain("depth=50");
-        handler.Requests[0].Headers.GetValues("Bitvavo-Access-Signature").ShouldHaveSingleItem().Length.ShouldBe(64);
+        handler.Requests[0].Headers.Contains("Bitvavo-Access-Signature").ShouldBeFalse();
     }
 
     [Fact]

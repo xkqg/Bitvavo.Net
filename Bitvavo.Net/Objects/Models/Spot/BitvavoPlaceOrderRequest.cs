@@ -28,6 +28,7 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// <param name="ResponseRequired">If false, Bitvavo returns a slimmer ack-only response (lower latency).</param>
 /// <param name="ClientOrderId">Caller-assigned UUID — useful for client-side correlation when Bitvavo's network ack is unreliable.</param>
 /// <param name="CodGroupId">Cancel-on-disconnect group id (1–1000).</param>
+/// <param name="DisableMarketProtection">If true, Bitvavo's market protection (which cancels orders that would execute far from the market price) is switched off for this order.</param>
 public record BitvavoPlaceOrderRequest(
     string Market,
     OrderSide Side,
@@ -44,4 +45,5 @@ public record BitvavoPlaceOrderRequest(
     SelfTradePrevention? SelfTradePrevention = null,
     bool? ResponseRequired = null,
     string? ClientOrderId = null,
-    int? CodGroupId = null);
+    int? CodGroupId = null,
+    bool? DisableMarketProtection = null);

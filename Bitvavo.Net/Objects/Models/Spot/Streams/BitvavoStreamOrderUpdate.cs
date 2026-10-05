@@ -121,4 +121,16 @@ public record BitvavoStreamOrderUpdate
     /// <summary>Cancel-on-disconnect group id (1–1000).</summary>
     [JsonPropertyName("codGroupId")]
     public int? CodGroupId { get; init; }
+
+    /// <summary>The <c>operatorId</c> of the request that placed or last changed the order (required by Bitvavo's AsyncAPI specification).</summary>
+    [JsonPropertyName("operatorId")]
+    public long? OperatorId { get; init; }
+
+    /// <summary>Server timestamp when the order was created, in unix nanoseconds (<see cref="Created"/> has millisecond resolution).</summary>
+    [JsonPropertyName("createdNs")]
+    public long? CreatedNs { get; init; }
+
+    /// <summary>Server timestamp of the most recent state change, in unix nanoseconds.</summary>
+    [JsonPropertyName("updatedNs")]
+    public long? UpdatedNs { get; init; }
 }

@@ -42,4 +42,8 @@ public record BitvavoStreamTrade
     /// <summary>Aggressor side. Wire form is <c>"buy"</c> / <c>"sell"</c>; deserialised via <c>EnumConverter</c> on <see cref="OrderSide"/>.</summary>
     [JsonPropertyName("side")]
     public OrderSide Side { get; init; }
+
+    /// <summary>Trade timestamp in unix nanoseconds (<see cref="Timestamp"/> has millisecond resolution).</summary>
+    [JsonPropertyName("timestampNs")]
+    public long? TimestampNs { get; init; }
 }

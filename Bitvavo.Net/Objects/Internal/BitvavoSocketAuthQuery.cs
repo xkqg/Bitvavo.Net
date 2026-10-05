@@ -21,7 +21,7 @@ internal sealed class BitvavoSocketAuthQuery : Query<BitvavoSocketAuthResponse>
     {
         // The message handler's TypeIdentifierCallback extracts the JSON's "event" field.
         // Bitvavo replies with event="authenticate" — route on that.
-        MessageRouter = MessageRouter.CreateWithoutTopicFilter<BitvavoSocketAuthResponse>(
+        MessageRouter = MessageRouter.CreateForQuery<BitvavoSocketAuthResponse>(
             "authenticate",
             HandleAuthResponse);
     }
@@ -31,7 +31,7 @@ internal sealed class BitvavoSocketAuthQuery : Query<BitvavoSocketAuthResponse>
     // from that return value. It must NEVER call Query.Handle — that is the router-dispatch
     // entry point, so re-entering it from inside a route handler re-routes the same message
     // straight back here and recurses until StackOverflowException.
-    private CallResult HandleAuthResponse(SocketConnection connection, System.DateTime receiveTime, string? originalData, BitvavoSocketAuthResponse message)
+    private CallResult<BitvavoSocketAuthResponse> HandleAuthResponse(SocketConnection connection, System.DateTime receiveTime, string? originalData, BitvavoSocketAuthResponse message)
         => EvaluateAuthResponse(message);
 
     /// <summary>
@@ -43,12 +43,12 @@ internal sealed class BitvavoSocketAuthQuery : Query<BitvavoSocketAuthResponse>
     /// </summary>
     /// <param name="message">The deserialised <c>{ "event": "authenticate", "authenticated": &lt;bool&gt; }</c> reply.</param>
     /// <returns>
-    /// <see cref="CallResult.SuccessResult"/> when <paramref name="message"/> reports
+    /// A successful <see cref="CallResult"/> (<c>CallResult.Ok</c>) when <paramref name="message"/> reports
     /// <see cref="BitvavoSocketAuthResponse.Authenticated"/> = <see langword="true"/>;
     /// a failed <see cref="CallResult"/> carrying an <see cref="ServerError"/> otherwise.
     /// </returns>
-    internal static CallResult EvaluateAuthResponse(BitvavoSocketAuthResponse message)
+    internal static CallResult<BitvavoSocketAuthResponse> EvaluateAuthResponse(BitvavoSocketAuthResponse message)
         => message.Authenticated
-            ? CallResult.SuccessResult
-            : new CallResult(new ServerError(new ErrorInfo(ErrorType.Unauthorized, "Bitvavo WebSocket authentication was rejected by the server")));
+            ? CallResult.Ok(message)
+            : CallResult.Fail<BitvavoSocketAuthResponse>(new ServerError(new ErrorInfo(ErrorType.Unauthorized, "Bitvavo WebSocket authentication was rejected by the server")));
 }

@@ -1,5 +1,8 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
+using System;
+using System.Threading;
+using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Objects.Errors;
 using CryptoExchange.Net.SharedApis;
 
@@ -9,19 +12,63 @@ namespace Bitvavo.Net.Objects.Internal;
 /// Bitvavo exchange-wide constants + symbol-formatting helper. Mirrors <c>KrakenExchange</c>'s
 /// shape — referenced by client classes (<see cref="Clients.SpotApi.BitvavoRestClientSpotApi.FormatSymbol"/>)
 /// and by the CryptoExchange.Net Shared-API implementations as the canonical
-/// <see cref="CryptoExchange.Net.SharedApis.ISharedClient.Exchange"/> identifier.
+/// <see cref="CryptoExchange.Net.Interfaces.Clients.IBaseApiClient.Exchange"/> identifier.
 /// </summary>
 public static class BitvavoExchange
 {
     /// <summary>
     /// Exchange identifier used by CryptoExchange.Net for logging, tracking, and as the
-    /// <see cref="CryptoExchange.Net.SharedApis.ISharedClient.Exchange"/> value. Mirrors
+    /// <see cref="CryptoExchange.Net.Interfaces.Clients.IBaseApiClient.Exchange"/> value. Mirrors
     /// <c>KrakenExchange.ExchangeName</c> / <c>BinanceExchange.ExchangeName</c>.
     /// </summary>
     public const string ExchangeName = "Bitvavo";
 
-    /// <summary>Bitvavo public-tier weight budget per minute (per source IP). 1000 weight/min.</summary>
+    /// <summary>
+    /// Platform metadata — identity, links and supported environments — as <c>KrakenExchange.Metadata</c>; the Shared API's
+    /// <c>Discover()</c> reports it next to the capabilities each API supports.
+    /// </summary>
+    public static PlatformInfo Metadata { get; } = new PlatformInfo(
+        ExchangeName,
+        "Bitvavo",
+        "https://raw.githubusercontent.com/xkqg/Bitvavo.Net/master/Bitvavo.Net/icon.png",
+        "https://bitvavo.com",
+        ["https://docs.bitvavo.com/"],
+        PlatformType.CryptoCurrencyExchange,
+        CentralizationType.Centralized,
+        BitvavoEnvironment.All);
+
+    /// <summary>Bitvavo's default weight budget per minute: 1000 points, tracked per account (authenticated) or per IP address (unauthenticated).</summary>
     public const int WeightPerMinute = 1000;
+
+    /// <summary>The weight of the heaviest single request Bitvavo documents (open orders / cancel orders without a market, atomic cancel).</summary>
+    internal const int MaxRequestWeight = 100;
+
+    private static BitvavoRateLimiters _rateLimiter = new();
+
+    /// <summary>
+    /// The client-side rate limiter every Bitvavo REST client in the process counts its requests against. Bitvavo's budget is
+    /// process-wide by nature (it belongs to the account or the IP address, not to a client instance), so this is one static,
+    /// settable object — as <c>KrakenExchange.RateLimiter</c> and <c>BinanceExchange.RateLimiter</c> are. Replace it to change the
+    /// headroom or the allocated limit, or to subscribe to its events; set it at start-up, since a replacement starts counting from zero.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">The value is null.</exception>
+    public static BitvavoRateLimiters RateLimiter
+    {
+        get => Volatile.Read(ref _rateLimiter);
+        set => Volatile.Write(ref _rateLimiter, value ?? throw new ArgumentNullException(nameof(value)));
+    }
+
+    /// <summary>
+    /// The ONE serialization policy of every Bitvavo request. Decimals travel as JSON strings (<c>"amount":"0.5"</c> — Bitvavo's
+    /// wire form for amounts and prices), enums as their mapped wire strings and DateTimes as unix-millisecond numbers (the
+    /// CryptoExchange.Net defaults). Parameters are sorted ordinally and case-insensitively, so the query string and the JSON
+    /// body — which the HMAC signs byte for byte — never depend on the host culture or the invariant-globalization switch.
+    /// </summary>
+    internal static readonly ParameterSerializationSettings ParameterSerializationSettings = new()
+    {
+        Decimal = DecimalSerialization.String,
+        SortComparer = System.StringComparer.OrdinalIgnoreCase,
+    };
 
     /// <summary>
     /// Format a base+quote pair into Bitvavo's wire convention: <c>BASE-QUOTE</c>
@@ -29,22 +76,4 @@ public static class BitvavoExchange
     /// </summary>
     public static string FormatSymbol(string baseAsset, string quoteAsset, TradingMode tradingMode, System.DateTime? deliverDate = null)
         => baseAsset.ToUpperInvariant() + "-" + quoteAsset.ToUpperInvariant();
-}
-
-/// <summary>
-/// Bitvavo error mappings consumed by the REST + WebSocket message handlers. The Bitvavo
-/// error envelope shape is uniform — <c>{ "errorCode": int, "error": "msg" }</c> — so the
-/// generic handler can parse every response without per-code metadata; this static class
-/// is the seam for populating <see cref="ErrorInfo"/> entries (e.g. <c>IsTransient</c>,
-/// <see cref="ErrorType"/>) per-code as the table is built up.
-/// </summary>
-internal static class BitvavoErrors
-{
-    /// <summary>
-    /// Spot-API error mapping. v0.3 ships empty: every server error funnels through
-    /// <see cref="ErrorMapping.GetErrorInfo(string, string)"/> which returns
-    /// <see cref="ErrorInfo.Unknown"/> for missing codes — perfectly safe, just less
-    /// granular for retry/transient classification. Populate per-code entries before v1.0.
-    /// </summary>
-    public static readonly ErrorMapping SpotMapping = new(System.Array.Empty<ErrorInfo>(), System.Array.Empty<ErrorEvaluator>());
 }

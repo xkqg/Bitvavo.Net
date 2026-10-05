@@ -1,5 +1,6 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
+using System;
 using CryptoExchange.Net.Objects;
 
 namespace Bitvavo.Net;
@@ -34,14 +35,12 @@ public class BitvavoEnvironment : TradeEnvironment
         spotRestBaseAddress: "https://api.bitvavo.com",
         spotSocketPublicAddress: "wss://ws.bitvavo.com/v2/");
 
-    /// <summary>Look up an environment by name. Returns <see cref="Live"/> for empty/null/Live.</summary>
-    public static BitvavoEnvironment? GetEnvironmentByName(string? name) => name switch
-    {
-        TradeEnvironmentNames.Live => Live,
-        "" => Live,
-        null => Live,
-        _ => null,
-    };
+    /// <summary>
+    /// Look up an environment by name, ignoring case (a <c>"Live"</c> from an appsettings file finds the same environment as
+    /// <c>"live"</c>). Returns <see cref="Live"/> for a null or empty name, and null for a name that is no environment.
+    /// </summary>
+    public static BitvavoEnvironment? GetEnvironmentByName(string? name)
+        => string.IsNullOrEmpty(name) || string.Equals(name, Live.Name, StringComparison.OrdinalIgnoreCase) ? Live : null;
 
     /// <summary>Available environment names.</summary>
     public static string[] All => new[] { Live.Name };

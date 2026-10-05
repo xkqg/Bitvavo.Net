@@ -28,7 +28,7 @@ public interface IBitvavoSocketClientSpotApiExchangeData
     /// <param name="interval">Candle interval (1m, 5m, 1h, 1d, etc.).</param>
     /// <param name="onMessage">Handler invoked for each candle event.</param>
     /// <param name="ct">Cancellation token used to close this subscription.</param>
-    Task<CallResult<UpdateSubscription>> SubscribeToKlineUpdatesAsync(
+    Task<WebSocketResult<UpdateSubscription>> SubscribeToKlineUpdatesAsync(
         string market,
         KlineInterval interval,
         Action<DataEvent<BitvavoStreamCandleEvent>> onMessage,
@@ -44,7 +44,7 @@ public interface IBitvavoSocketClientSpotApiExchangeData
     /// <param name="market">Market identifier, e.g. <c>"BTC-EUR"</c>.</param>
     /// <param name="onMessage">Handler invoked for each public trade event.</param>
     /// <param name="ct">Cancellation token used to close this subscription.</param>
-    Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+    Task<WebSocketResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
         string market,
         Action<DataEvent<BitvavoStreamTrade>> onMessage,
         CancellationToken ct = default);
@@ -61,7 +61,7 @@ public interface IBitvavoSocketClientSpotApiExchangeData
     /// <param name="markets">Market identifiers, e.g. <c>["BTC-EUR", "ETH-EUR"]</c>.</param>
     /// <param name="onMessage">Handler invoked for each public trade event; dispatch by <c>Data.Market</c>.</param>
     /// <param name="ct">Cancellation token used to close this subscription.</param>
-    Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+    Task<WebSocketResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
         IEnumerable<string> markets,
         Action<DataEvent<BitvavoStreamTrade>> onMessage,
         CancellationToken ct = default);

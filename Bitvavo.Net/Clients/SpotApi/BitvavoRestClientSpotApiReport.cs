@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bitvavo.Net.Interfaces.Clients.SpotApi;
+using Bitvavo.Net.Objects.Internal;
 using Bitvavo.Net.Objects.Models.Spot;
 using CryptoExchange.Net.Objects;
 
@@ -23,7 +24,7 @@ internal sealed class BitvavoRestClientSpotApiReport : IBitvavoRestClientSpotApi
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<IEnumerable<BitvavoTradesReport>>> GetTradesReportAsync(
+    public Task<HttpResult<IEnumerable<BitvavoTradesReport>>> GetTradesReportAsync(
         string market,
         int? limit = null,
         DateTime? startTime = null,
@@ -32,24 +33,25 @@ internal sealed class BitvavoRestClientSpotApiReport : IBitvavoRestClientSpotApi
         string? tradeIdTo = null,
         CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.AddOptional("limit", limit);
-        parameters.AddOptionalMilliseconds("start", startTime);
-        parameters.AddOptionalMilliseconds("end", endTime);
-        parameters.AddOptional("tradeIdFrom", tradeIdFrom);
-        parameters.AddOptional("tradeIdTo", tradeIdTo);
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("limit", limit);
+        parameters.Add("start", startTime);
+        parameters.Add("end", endTime);
+        parameters.Add("tradeIdFrom", tradeIdFrom);
+        parameters.Add("tradeIdTo", tradeIdTo);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, $"v2/report/{market}/trades", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
+        // A public endpoint (like every market-data endpoint): it needs no credentials and counts against the per-IP budget.
+        var def = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, $"v2/report/{market}/trades", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: false);
         return _baseClient.SendAsync<IEnumerable<BitvavoTradesReport>>(def, parameters, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<BitvavoBookReport>> GetBookReportAsync(string market, int? depth = null, CancellationToken ct = default)
+    public Task<HttpResult<BitvavoBookReport>> GetBookReportAsync(string market, int? depth = null, CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.AddOptional("depth", depth);
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("depth", depth);
 
-        var def = _definitions.GetOrCreate(HttpMethod.Get, $"v2/report/{market}/book", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
+        var def = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, $"v2/report/{market}/book", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: false);
         return _baseClient.SendAsync<BitvavoBookReport>(def, parameters, ct);
     }
 }

@@ -13,10 +13,10 @@ using Xunit;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Drives Phase 3I — codifies the contract of
-/// <see cref="BitvavoRestSpotMessageHandler.ParseErrorResponse"/>. No production code
-/// change is expected; the test-bed is the regression net so future refactors can't
-/// silently break Bitvavo's <c>{ "errorCode": int, "error": "msg" }</c> envelope handling.
+/// The contract of <see cref="BitvavoRestSpotMessageHandler.ParseErrorResponse"/> and
+/// <see cref="BitvavoRestSpotMessageHandler.ParseErrorRateLimitResponse"/>: the regression net for Bitvavo's
+/// <c>{ "errorCode": int, "error": "msg" }</c> envelope, including the bodies that are no envelope at all (an array, an
+/// object without the fields, fields of another type).
 /// </summary>
 public class BitvavoErrorParsingTests
 {
@@ -63,6 +63,42 @@ public class BitvavoErrorParsingTests
         // The framework's GetJsonDocument returns its own parseError on invalid JSON;
         // we only care that it doesn't throw and that the returned Error is non-null.
         error.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task ParseErrorResponse_ArrayBody_returns_ServerError_with_unknown_info()
+    {
+        var error = await NewHandler().ParseErrorResponse(400, EmptyHeaders, Body("[]"));
+
+        error.ShouldBeOfType<ServerError>();
+        error.ErrorType.ShouldBe(ErrorInfo.Unknown.ErrorType);
+        error.ErrorCode.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("""{"errorCode":105,"error":"Rate limit exceeded"}""", "105", "Rate limit exceeded")]
+    [InlineData("""{"errorCode":112}""", "112", null)]
+    [InlineData("""{"error":"Too many requests"}""", null, "Too many requests")]
+    public async Task ParseErrorRateLimitResponse_keeps_whatever_the_server_said(string body, string? code, string? message)
+    {
+        var error = await NewHandler().ParseErrorRateLimitResponse(429, EmptyHeaders, Body(body));
+
+        error.ErrorCode.ShouldBe(code);
+        // CryptoExchange.Net prefixes the server's text with its own "Server rate limit exceeded", which is all there is without one.
+        error.ToString().ShouldContain(message ?? "Server rate limit exceeded");
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("""{"foo":"bar"}""")]
+    [InlineData("""{"errorCode":"x","error":5}""")]
+    [InlineData("not json at all <html>")]
+    public async Task ParseErrorRateLimitResponse_without_a_usable_envelope_is_the_plain_rate_limit_error(string body)
+    {
+        var error = await NewHandler().ParseErrorRateLimitResponse(429, EmptyHeaders, Body(body));
+
+        error.ShouldBeOfType<ServerRateLimitError>();
+        error.ErrorCode.ShouldBeNull();
     }
 
     [Fact]

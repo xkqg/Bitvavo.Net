@@ -42,4 +42,10 @@ public class BitvavoRestOptions : RestExchangeOptions<BitvavoEnvironment, Bitvav
         targetOptions.ReceiveWindowMs = ReceiveWindowMs;
         return targetOptions;
     }
+
+    /// <summary>
+    /// An independent copy, for a client of its own: what that client does to its options (<c>SetOptions</c> rewrites the timeout
+    /// and the proxy) stays with it instead of reaching the options of the container and of every client created after it.
+    /// </summary>
+    internal BitvavoRestOptions Copy() => Set(new BitvavoRestOptions());
 }

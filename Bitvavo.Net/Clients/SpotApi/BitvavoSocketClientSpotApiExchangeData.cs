@@ -29,7 +29,7 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
     }
 
     /// <inheritdoc />
-    public Task<CallResult<UpdateSubscription>> SubscribeToKlineUpdatesAsync(
+    public Task<WebSocketResult<UpdateSubscription>> SubscribeToKlineUpdatesAsync(
         string market,
         KlineInterval interval,
         Action<DataEvent<BitvavoStreamCandleEvent>> onMessage,
@@ -59,7 +59,7 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
     }
 
     /// <inheritdoc />
-    public Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+    public Task<WebSocketResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
         string market,
         Action<DataEvent<BitvavoStreamTrade>> onMessage,
         CancellationToken ct = default)
@@ -86,7 +86,7 @@ internal sealed class BitvavoSocketClientSpotApiExchangeData : IBitvavoSocketCli
     }
 
     /// <inheritdoc />
-    public Task<CallResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
+    public Task<WebSocketResult<UpdateSubscription>> SubscribeToTradeUpdatesAsync(
         IEnumerable<string> markets,
         Action<DataEvent<BitvavoStreamTrade>> onMessage,
         CancellationToken ct = default)

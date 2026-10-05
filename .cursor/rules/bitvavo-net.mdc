@@ -1,0 +1,107 @@
+---
+description: Conventions for using Bitvavo.Net (Bitvavo spot REST and WebSocket) in C#/.NET and for contributing to the Bitvavo.Net repository. Apply when generating code that interacts with the Bitvavo API or when editing this library.
+globs:
+  - "**/*.cs"
+  - "**/*.csproj"
+alwaysApply: false
+---
+
+# Bitvavo.Net Conventions
+
+This rule covers code that uses **Bitvavo.Net** for Bitvavo spot exchange access (no futures, no margin, no testnet), and work on the Bitvavo.Net library itself. Do not write raw `HttpClient` or `ClientWebSocket` calls to Bitvavo endpoints.
+
+## Client setup pattern
+
+```csharp
+using Bitvavo.Net;
+using Bitvavo.Net.Clients;
+
+using var restClient = new BitvavoRestClient(options =>
+    options.ApiCredentials = new BitvavoCredentials(apiKey, apiSecret));
+```
+
+Public market data needs no credentials: `new BitvavoRestClient()`.
+DI: `services.AddBitvavo()` (namespace `Bitvavo.Net.Extensions`), then inject `IBitvavoRestClient`, `IBitvavoSocketClient`, `IBitvavoSharedApiClient`.
+Never hardcode or commit API keys.
+
+## Result pattern
+
+REST methods return `Task<HttpResult<T>>`. Subscriptions return `Task<WebSocketResult<UpdateSubscription>>`.
+Always check `.Success` before reading `.Data`:
+
+```csharp
+var prices = await restClient.SpotApi.ExchangeData.GetTickerPricesAsync("ETH-EUR");
+if (!prices.Success) { Console.WriteLine(prices.Error); return; }
+var price = prices.Data.First().Price;
+```
+
+`.Error.ErrorType` is the mapped CryptoExchange.Net `ErrorType` (Bitvavo's 90 error codes are mapped). Branch on it, not on message text.
+
+## API surface
+
+- `restClient.SpotApi.{ExchangeData|Account|Trading|Funding|Report|Institutional}`
+- `socketClient.SpotApi.ExchangeData` for candle and trade subscriptions
+- `socketClient.SpotApi.Account` for the private order and fill stream (authenticated, per market)
+- `SpotApi.SharedApi` on REST and socket for `CryptoExchange.Net.SharedApis` (v2). `SpotApi.SharedClient` = legacy v1, same object
+- `IBitvavoSharedApiClient`: `GetCapability<T>()`, `GetCapabilities<T>()`, `Discover()` over both transports
+
+## Bitvavo-specific details
+
+- Markets are `BASE-QUOTE`, uppercase, dash: `ETH-EUR`. Same on REST and WebSocket.
+- Every order operation needs an operator id (`long`): `BitvavoPlaceOrderRequest(..., OperatorId: 1, ...)`, `CancelOrderAsync(market, operatorId, ...)`, `CancelOrdersAsync(operatorId, ...)`.
+- `clientOrderId` must be a UUID: `Guid.NewGuid().ToString()`.
+- Only `BitvavoEnvironment.Live` exists. No testnet and no validate-only flag: every order call is live.
+- Shared API exchange parameters (exchange name `Bitvavo`): `OperatorId` (`long`), `Markets` (`string[]`, private subscriptions), optional `TriggerReference`.
+- Use `KlineInterval` and `BitvavoMarket.TickSize`. `PricePrecision` is null on live markets.
+- Error 109 maps to `ErrorType.Timeout`, not transient: read the order back before retrying.
+- Rate limiting is one static limiter per process: `BitvavoExchange.RateLimiter` (namespace `Bitvavo.Net.Objects.Internal`). Two budgets of 1000 weight per minute: signed and public.
+- `AddBitvavo(o => o.ApiCredentials = ...)` with an untyped lambda configures only the REST client at language version C# 13 or later (the default of net9.0+ projects); at C# 12, the net8.0 default, it picks the library-options overload and both clients get the credentials. Type the parameter, `(BitvavoOptions o) => ...`, or use configuration to configure both clients at every language version.
+
+## WebSocket pattern
+
+```csharp
+using var socketClient = new BitvavoSocketClient();
+var sub = await socketClient.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync(
+    "ETH-EUR",
+    update => Console.WriteLine($"{update.Data.Market} {update.Data.Price}"));
+if (!sub.Success) { Console.WriteLine(sub.Error); return; }
+
+await sub.Data.CloseAsync();
+```
+
+A subscribe counts as successful once it is sent: Bitvavo sends no per-subscription acknowledgment.
+Cancelling the token passed to the subscribe call also closes the subscription.
+
+## Hard rules for consumer code
+
+- Never use raw HTTP or raw sockets for Bitvavo.
+- Never use `.Result` or `.Wait()`.
+- Never create a client per request in production; reuse clients or use DI.
+- Never read `.Data` without checking `.Success`.
+- Never omit the operator id on an order operation.
+- Never invent method names; inspect `Bitvavo.Net/Interfaces/Clients/**`.
+- Not implemented: public ticker and book WebSocket channels, local order book, trackers, multi-user client provider, WebSocket request/response actions, balance subscription, batch orders.
+
+## Hard rules when editing this repository
+
+- TDD: failing test first, confirm RED, then implement. Bug fix = failing repro first.
+- 0 warnings and 0 errors on net8.0, net9.0, net10.0. CI builds Release with `-warnaserror`.
+- Always braces on `if`, `else`, `for`, `foreach`, `while`.
+- No static `*Helper` / `*Util` classes: extension methods (`this T value`) or generics.
+- No tuples: a multi-value result is a named `public readonly record struct`.
+- XML docs on every public member. English only (code, comments, docs, commit messages).
+- Public REST returns `Task<HttpResult<T>>`, subscriptions `Task<WebSocketResult<UpdateSubscription>>`. Never WebCallResult or CallResult.
+- Shared API: extend through one partial file per capability + its interface in the aggregate interface + its options in `SetCapabilities`. `BitvavoSharedApiRegistrationTests` fails when the three disagree.
+- New REST endpoint = interface member + implementation + a row in `BitvavoEndpointContracts.All`.
+- Tests: the only seam is the transport (`StubHttpMessageHandler`, CryptoExchange.Net `TestSocket`, `RecordingSocketFactory`). No mocks of own types. Rate limiting stays on.
+- One version number: `<Version>` in `Bitvavo.Net/Bitvavo.Net.csproj`.
+- Commands: `dotnet build Bitvavo.Net.slnx`, `dotnet run --project Bitvavo.Net.Tests -f net10.0` (also net8.0, net9.0). `dotnet test` runs 0 tests on SDK 10.
+
+## Reference
+
+- Rules and fuller examples: `AGENTS.md` in repo root
+- LLM index: `llms.txt` in repo root
+- Full LLM context: `llms-full.txt` in repo root
+- API map (member, verb, path, weight, models, enums, errors): `docs/ai-api-map.md`
+- How it is built: `ARCHITECTURE.md`
+- Compilable samples: `Bitvavo.Net/Examples/ReadmeSamples/ReadmeSamples.cs`, `Bitvavo.Net/Examples/QuickStart/Program.cs`

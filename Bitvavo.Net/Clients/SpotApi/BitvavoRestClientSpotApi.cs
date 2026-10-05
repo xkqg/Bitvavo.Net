@@ -14,9 +14,7 @@ using CryptoExchange.Net.Converters.SystemTextJson;
 using CryptoExchange.Net.Interfaces;
 using CryptoExchange.Net.Objects;
 using CryptoExchange.Net.Objects.Errors;
-using CryptoExchange.Net.RateLimiting;
-using CryptoExchange.Net.RateLimiting.Filters;
-using CryptoExchange.Net.RateLimiting.Guards;
+using CryptoExchange.Net.Objects.Options;
 using CryptoExchange.Net.RateLimiting.Interfaces;
 using CryptoExchange.Net.SharedApis;
 using Microsoft.Extensions.Logging;
@@ -25,29 +23,19 @@ namespace Bitvavo.Net.Clients.SpotApi;
 
 /// <inheritdoc cref="IBitvavoRestClientSpotApi" />
 /// <remarks>
-/// The CryptoExchange.Net Shared-API surface is implemented in the facade-hosted partial
-/// <c>BitvavoRestClientSpotApi.Shared.cs</c> — <c>sealed</c> is dropped here only so the
-/// partial can be split across files (the type is still non-extensible: <c>internal</c>
-/// with no derived types). Mirrors <c>KrakenRestClientSpotApi</c>.
+/// The CryptoExchange.Net Shared API (V1 and V2 on one instance) lives in <see cref="BitvavoRestClientSpotSharedApi"/>, which
+/// this client creates and exposes as <see cref="SharedClient"/> and <see cref="SharedApi"/>. Mirrors <c>KrakenRestClientSpotApi</c>.
 /// </remarks>
-internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironment, BitvavoAuthenticationProvider, BitvavoCredentials>, IBitvavoRestClientSpotApi
+internal sealed class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironment, BitvavoAuthenticationProvider, BitvavoCredentials>, IBitvavoRestClientSpotApi
 {
     /// <summary>
-    /// Per-host weight gate — Bitvavo enforces <see cref="BitvavoExchange.WeightPerMinute"/>
-    /// (1000) per IP per rolling minute. The gate undercuts that by <see cref="ClientSafetyMargin"/>
-    /// so client-side scheduling never races the server limit (avoids 429s and the resulting
-    /// IP throttle escalations). Endpoints opt in by passing this gate to
-    /// <c>_definitions.GetOrCreate(method, path, RateLimitGate, weight, authenticated)</c>;
-    /// per-endpoint weight tables are tracked for v0.4.0 rollout (see CHANGELOG).
+    /// The gate every endpoint definition is created with — one stable indirection to the current
+    /// <see cref="BitvavoExchange.RateLimiter"/> (the weight budgets, the headroom, the events), so replacing the limiter
+    /// takes effect for endpoints that were already called. A definition is cached on first use and keeps its gate for good.
     /// </summary>
-    private const int ClientSafetyMargin = 100;
-    internal static readonly IRateLimitGate RateLimitGate = new RateLimitGate("Bitvavo")
-        .AddGuard(new RateLimitGuard(
-            keySelector: RateLimitGuard.PerHost,
-            filter: new HostFilter("api.bitvavo.com"),
-            limit: BitvavoExchange.WeightPerMinute - ClientSafetyMargin,
-            timeSpan: TimeSpan.FromMinutes(1),
-            windowType: RateLimitWindowType.Sliding));
+    internal static IRateLimitGate RateLimitGate => BitvavoRateLimitGate.Instance;
+
+    private readonly BitvavoRestClientSpotSharedApi _sharedApi;
 
     /// <inheritdoc />
     public new BitvavoRestOptions ClientOptions => (BitvavoRestOptions)base.ClientOptions;
@@ -77,18 +65,13 @@ internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironme
     public IBitvavoRestClientSpotApiInstitutional Institutional { get; }
 
     /// <inheritdoc />
-    /// <remarks>
-    /// The Shared-API surface is implemented directly on this class (see the
-    /// <c>BitvavoRestClientSpotApi.Shared.cs</c> facade-hosted partial), so the accessor
-    /// returns <c>this</c>.
-    /// </remarks>
-    public IBitvavoRestClientSpotApiShared SharedClient => this;
+    public IBitvavoRestClientSpotApiShared SharedClient => _sharedApi;
 
-    /// <summary>Display name of the exchange — used by CryptoExchange.Net diagnostics.</summary>
-    public string ExchangeName => BitvavoExchange.ExchangeName;
+    /// <inheritdoc />
+    public IBitvavoRestClientSpotSharedApi SharedApi => _sharedApi;
 
-    internal BitvavoRestClientSpotApi(ILogger logger, HttpClient? httpClient, BitvavoRestOptions options)
-        : base(logger, httpClient, options.Environment.SpotRestBaseAddress, options, options.SpotOptions)
+    internal BitvavoRestClientSpotApi(ILoggerFactory? loggerFactory, HttpClient? httpClient, BitvavoRestOptions options)
+        : base(loggerFactory, BitvavoExchange.ExchangeName, httpClient, options.Environment.SpotRestBaseAddress, options, options.SpotOptions)
     {
         ExchangeData = new BitvavoRestClientSpotApiExchangeData(this);
         Account = new BitvavoRestClientSpotApiAccount(this);
@@ -96,6 +79,7 @@ internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironme
         Funding = new BitvavoRestClientSpotApiFunding(this);
         Report = new BitvavoRestClientSpotApiReport(this);
         Institutional = new BitvavoRestClientSpotApiInstitutional(this);
+        _sharedApi = new BitvavoRestClientSpotSharedApi(this);
     }
 
     /// <inheritdoc />
@@ -106,8 +90,55 @@ internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironme
     protected override BitvavoAuthenticationProvider CreateAuthenticationProvider(BitvavoCredentials credentials)
         => new(credentials, ClientOptions.ReceiveWindowMs);
 
+    private readonly object _credentialsGate = new();
+
+    /// <summary>
+    /// The signing provider, read under the lock that <see cref="SetApiCredentials"/> and <see cref="SetOptions"/> hold while they
+    /// replace the key. CryptoExchange.Net 13.1.0 replaces the provider in several steps; a request that reads it in between finds
+    /// none, and an authenticated call then fails as if no credentials were set.
+    /// </summary>
+    public override BitvavoAuthenticationProvider? AuthenticationProvider
+    {
+        get
+        {
+            lock (_credentialsGate)
+            {
+                return base.AuthenticationProvider;
+            }
+        }
+    }
+
     /// <inheritdoc />
-    protected override IMessageSerializer CreateSerializer() 
+    public override void SetApiCredentials(BitvavoCredentials credentials)
+    {
+        lock (_credentialsGate)
+        {
+            base.SetApiCredentials(credentials);
+        }
+    }
+
+    /// <inheritdoc />
+    public override void SetOptions(UpdateOptions<BitvavoCredentials> options)
+    {
+        lock (_credentialsGate)
+        {
+            base.SetOptions(options);
+        }
+    }
+
+    /// <summary>
+    /// The exchange clock for <c>AutoTimestamp</c>: the public <c>GET /v2/time</c>. Public on purpose — a time request that
+    /// had to be signed would need the very time sync it is performing, and the framework repeats the sync before signed
+    /// requests whenever it fails.
+    /// </summary>
+    protected override async Task<HttpResult<DateTime>> GetServerTimestampAsync()
+    {
+        var result = await ExchangeData.GetServerTimeAsync().ConfigureAwait(false);
+        return result.Success ? HttpResult.Ok(result, result.Data.Time) : HttpResult.Fail<DateTime>(result);
+    }
+
+    /// <inheritdoc />
+    protected override IMessageSerializer CreateSerializer()
         => new SystemTextJsonMessageSerializer(new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
     /// <summary>
@@ -115,14 +146,14 @@ internal partial class BitvavoRestClientSpotApi : RestApiClient<BitvavoEnvironme
     /// Always passes a fresh empty additional-headers dictionary so the auth provider has a concrete <c>Headers</c> bag to
     /// add the four Bitvavo-Access-* signed-request headers to. Mirrors KrakenRestClientSpotApi.SendAsync.
     /// </summary>
-    internal Task<WebCallResult<T>> SendAsync<T>(RequestDefinition definition, ParameterCollection? parameters, CancellationToken cancellationToken, int? weight = null)
-        => SendAsync<T>(BaseAddress, definition, parameters, cancellationToken, new System.Collections.Generic.Dictionary<string, string>(), weight);
+    internal Task<HttpResult<T>> SendAsync<T>(RequestDefinition definition, Parameters? parameters, CancellationToken cancellationToken, int? weight = null)
+        => SendAsync<T>(definition, parameters, cancellationToken, new System.Collections.Generic.Dictionary<string, string>(), weight);
 
     /// <summary>
     /// Internal SendAsync wrapper for endpoints that need separate query + body parameter collections (signed POST/PUT).
     /// Splits the framework's two-collection overload to keep sub-client call sites terse and ensures a non-null additional-headers
     /// dictionary is always present for the auth provider to fill in.
     /// </summary>
-    internal Task<WebCallResult<T>> SendAsync<T>(RequestDefinition definition, ParameterCollection? queryParameters, ParameterCollection? bodyParameters, CancellationToken cancellationToken, int? weight = null)
-        => SendAsync<T>(BaseAddress, definition, queryParameters, bodyParameters, cancellationToken, new System.Collections.Generic.Dictionary<string, string>(), weight);
+    internal Task<HttpResult<T>> SendAsync<T>(RequestDefinition definition, Parameters? queryParameters, Parameters? bodyParameters, CancellationToken cancellationToken, int? weight = null)
+        => SendAsync<T>(definition, queryParameters, bodyParameters, cancellationToken, new System.Collections.Generic.Dictionary<string, string>(), weight);
 }

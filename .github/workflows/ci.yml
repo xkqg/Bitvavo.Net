@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Opt JS actions into Node 24 ahead of the Sept 2026 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  build-test:
+    name: build + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - uses: actions/checkout@v5
+
+      # One SDK builds every target framework; the 8.0 / 9.0 SDKs bring the runtimes for the per-TFM test legs.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore Bitvavo.Net.slnx
+
+      # Release + warnings-as-errors: includes vulnerable-package advisories (NU19xx) and compiles Examples/QuickStart.
+      - name: Build
+        run: dotnet build Bitvavo.Net.slnx --no-restore --configuration Release -warnaserror
+
+      # xunit v3 test project = an executable. `dotnet test` on SDK 10 would run 0 tests and still exit 0.
+      - name: Test net8.0
+        run: dotnet run --project Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj --no-build --configuration Release --framework net8.0
+
+      - name: Test net9.0
+        run: dotnet run --project Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj --no-build --configuration Release --framework net9.0
+
+      - name: Test net10.0
+        run: dotnet run --project Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj --no-build --configuration Release --framework net10.0
+
+  pack:
+    name: pack validation
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack Bitvavo.Net/Bitvavo.Net.csproj --configuration Release --output artifacts
+
+      # DebugType=embedded bakes the symbols into the assembly: the package set is exactly ONE .nupkg (no .snupkg).
+      - name: Verify the package
+        run: |
+          ls -la artifacts
+          test "$(ls artifacts/*.nupkg | wc -l)" -eq 1
+          test -z "$(ls artifacts/*.snupkg 2>/dev/null)"

@@ -134,4 +134,26 @@ public record BitvavoOrder
     /// <summary>Currency of the held amount.</summary>
     [JsonPropertyName("onHoldCurrency")]
     public string? OnHoldCurrency { get; init; }
+
+    /// <summary>True when the order was placed with Bitvavo's market protection switched off.</summary>
+    [JsonPropertyName("disableMarketProtection")]
+    public bool? DisableMarketProtection { get; init; }
+
+    /// <summary>
+    /// Why Bitvavo restated (cancelled or reduced) the order, when it did — for example <c>decrementOnSelfTradePrevention</c>,
+    /// <c>cancelOnSelfTradePrevention</c>, <c>cancelOnPlacementPriceProtection</c>, <c>cancelOnExecutionPriceProtection</c>,
+    /// <c>cancelOnSpreadProtection</c>, <c>cancelOnReferencePriceProtection</c>, <c>cancelPostOnlyOnAuctionMatching</c>,
+    /// <c>cancelOnMaintenance</c>, <c>cancelOnDisconnect</c>, <c>cancelOnDelisting</c>, <c>cancelOnLockPlaced</c>,
+    /// <c>cancelOnAdminRequest</c>, <c>cancelPostOnly</c>. A string, as on the account stream, so a new reason never breaks the read.
+    /// </summary>
+    [JsonPropertyName("restatementReason")]
+    public string? RestatementReason { get; init; }
+
+    /// <summary>Server timestamp when the order was created, in unix nanoseconds (<see cref="Created"/> has millisecond resolution).</summary>
+    [JsonPropertyName("createdNs")]
+    public long? CreatedNs { get; init; }
+
+    /// <summary>Server timestamp of the most recent state change, in unix nanoseconds.</summary>
+    [JsonPropertyName("updatedNs")]
+    public long? UpdatedNs { get; init; }
 }

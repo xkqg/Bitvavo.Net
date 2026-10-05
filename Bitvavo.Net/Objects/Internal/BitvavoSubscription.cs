@@ -32,7 +32,7 @@ internal sealed class BitvavoSubscription<T> : Subscription
         _channel = channel;
 
         IndividualSubscriptionCount = channel.Markets.Length;
-        MessageRouter = MessageRouter.CreateWithTopicFilter<T>(typeIdentifier, topic, DoHandleMessage);
+        MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, topic, DoHandleMessage);
     }
 
     /// <summary>
@@ -52,7 +52,7 @@ internal sealed class BitvavoSubscription<T> : Subscription
         _channel = channel;
 
         IndividualSubscriptionCount = channel.Markets.Length;
-        MessageRouter = MessageRouter.CreateWithTopicFilters<T>(typeIdentifier, topics, DoHandleMessage);
+        MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, topics, DoHandleMessage);
     }
 
     protected override Query? GetSubQuery(SocketConnection connection) =>
@@ -72,6 +72,6 @@ internal sealed class BitvavoSubscription<T> : Subscription
     public CallResult DoHandleMessage(SocketConnection connection, DateTime receiveTime, string? originalData, T message)
     {
         _handler.Invoke(receiveTime, originalData, message);
-        return CallResult.SuccessResult;
+        return CallResult.Ok();
     }
 }

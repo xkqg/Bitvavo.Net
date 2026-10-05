@@ -1,5 +1,6 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
+using System;
 using CryptoExchange.Net.Authentication;
 using Shouldly;
 using Xunit;
@@ -7,13 +8,30 @@ using Xunit;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Drives Phase 2A — <see cref="BitvavoCredentials.Copy"/> currently re-uses the same
-/// <see cref="HMACCredential"/> reference. After the fix it must construct a fresh
-/// <see cref="HMACCredential"/> from the original key/secret so framework-side mutation of
-/// either copy can't bleed into the other.
+/// <see cref="BitvavoCredentials.Copy"/> constructs a fresh <see cref="HMACCredential"/> from the original key/secret, so
+/// framework-side mutation of either copy can't bleed into the other; <see cref="BitvavoCredentials.Validate"/> accepts
+/// credentials without a spot credential (public-only use) and refuses a spot credential without a key.
 /// </summary>
 public class BitvavoCredentialsTests
 {
+    [Fact]
+    public void Validate_accepts_credentials_without_a_spot_credential()
+    {
+        Should.NotThrow(() => new BitvavoCredentials().Validate());
+    }
+
+    [Fact]
+    public void Validate_accepts_a_spot_credential_with_a_key_and_a_secret()
+    {
+        Should.NotThrow(() => new BitvavoCredentials("test-key", "test-secret").Validate());
+    }
+
+    [Fact]
+    public void Validate_refuses_a_spot_credential_without_a_key()
+    {
+        Should.Throw<ArgumentException>(() => new BitvavoCredentials(new HMACCredential(string.Empty, "test-secret")).Validate());
+    }
+
     [Fact]
     public void Copy_PreservesSpotKeyAndSecret()
     {
@@ -33,7 +51,7 @@ public class BitvavoCredentialsTests
 
         var copy = (BitvavoCredentials)original.Copy();
 
-        // Phase 2A's deep-copy contract: each Copy() must yield a freshly-constructed Spot,
+        // The deep-copy contract: each Copy() must yield a freshly-constructed Spot,
         // never a shared reference, so that ApiCredentials lifecycle handling on one client
         // can't disturb another.
         copy.Spot.ShouldNotBeSameAs(original.Spot);

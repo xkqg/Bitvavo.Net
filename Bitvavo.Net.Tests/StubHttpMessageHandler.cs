@@ -10,10 +10,9 @@ using System.Threading.Tasks;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Test double for <see cref="HttpMessageHandler"/> — feeds canned JSON responses to the
-/// CryptoExchange.Net request pipeline so we can verify our DTO + mapping logic without
-/// hitting api.bitvavo.com. NSubstitute can't mock <c>HttpMessageHandler.SendAsync</c>
-/// directly (it's protected), hence the explicit subclass.
+/// The network-transport seam of the test suite: an <see cref="HttpMessageHandler"/> that feeds canned JSON responses to the
+/// CryptoExchange.Net request pipeline and records every request, so DTO mapping, signing and rate limiting are verified
+/// through the real pipeline without hitting api.bitvavo.com. Nothing of the library itself is replaced.
 /// </summary>
 internal sealed class StubHttpMessageHandler : HttpMessageHandler
 {

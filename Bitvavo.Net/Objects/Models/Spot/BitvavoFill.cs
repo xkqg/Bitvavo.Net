@@ -67,4 +67,8 @@ public record BitvavoFill
     /// <summary>True once the fill is fully settled on Bitvavo's books.</summary>
     [JsonPropertyName("settled")]
     public bool? Settled { get; init; }
+
+    /// <summary>The <c>operatorId</c> of the request that placed the order. Present in standalone <c>/v2/trades</c> responses.</summary>
+    [JsonPropertyName("operatorId")]
+    public long? OperatorId { get; init; }
 }

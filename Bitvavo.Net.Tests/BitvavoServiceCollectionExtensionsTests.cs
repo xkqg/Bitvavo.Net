@@ -1,12 +1,19 @@
 // Copyright (c) Bitvavo.Net contributors. Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
-using Bitvavo.Net.Clients;
+using System.Threading;
+using System.Threading.Tasks;
+using Bitvavo.Net.Clients.SpotApi;
+using Bitvavo.Net.Extensions;
 using Bitvavo.Net.Interfaces.Clients;
+using Bitvavo.Net.Interfaces.Clients.SpotApi;
 using Bitvavo.Net.Objects.Options;
+using CryptoExchange.Net.Objects;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;
@@ -14,99 +21,93 @@ using Xunit;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Drives Phase 2B — the README references <c>services.AddBitvavo()</c> but the extension
-/// method doesn't exist yet. These tests resolve the type by name (reflection) so the file
-/// compiles even before Phase 2B lands; they fail RED until the extension is implemented,
-/// turn GREEN once the registrations are wired correctly.
+/// The DI registration as 0.4.0 consumers call it (<c>AddBitvavo()</c> and the REST/socket options delegates): the clients
+/// resolve with the right lifetime, <c>PostConfigure</c> keeps working, and the typed HTTP client of the REST client carries the
+/// configured timeout and a handler that is never rotated underneath it. The library-options overloads are in
+/// <see cref="BitvavoLibraryOptionsRegistrationTests"/>, the Shared API client in <see cref="BitvavoSharedApiClientRegistrationTests"/>.
 /// </summary>
 public class BitvavoServiceCollectionExtensionsTests
 {
-    private static MethodInfo? FindAddBitvavoMethod()
+    [Fact]
+    public void The_rest_client_is_registered_per_resolution_and_the_socket_client_as_a_singleton()
     {
-        // Expected location after Phase 2B: Bitvavo.Net.Extensions.BitvavoServiceCollectionExtensions.AddBitvavo
-        var assembly = typeof(BitvavoRestClient).Assembly;
-        var ext = assembly.GetType("Bitvavo.Net.Extensions.BitvavoServiceCollectionExtensions");
-        if (ext == null) return null;
-        return ext.GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .FirstOrDefault(m => m.Name == "AddBitvavo" && m.GetParameters().Length >= 1);
-    }
+        var services = new ServiceCollection().AddBitvavo();
 
-    private static IServiceCollection InvokeAddBitvavo(
-        IServiceCollection services,
-        Action<BitvavoRestOptions>? rest = null,
-        Action<BitvavoSocketOptions>? socket = null)
-    {
-        var method = FindAddBitvavoMethod()
-            ?? throw new MissingMethodException("Bitvavo.Net.Extensions.BitvavoServiceCollectionExtensions.AddBitvavo");
-
-        // Allow either AddBitvavo(IServiceCollection) or AddBitvavo(IServiceCollection, Action<RestOpts>, Action<SocketOpts>).
-        var paramCount = method.GetParameters().Length;
-        object?[] args = paramCount switch
-        {
-            1 => new object?[] { services },
-            2 => new object?[] { services, rest },
-            3 => new object?[] { services, rest, socket },
-            _ => throw new InvalidOperationException($"Unexpected AddBitvavo arity: {paramCount}"),
-        };
-        return (IServiceCollection)method.Invoke(null, args)!;
+        services.Last(d => d.ServiceType == typeof(IBitvavoRestClient)).Lifetime.ShouldBe(ServiceLifetime.Transient);
+        services.Last(d => d.ServiceType == typeof(IBitvavoSocketClient)).Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
     [Fact]
-    public void AddBitvavo_RegistersIBitvavoRestClient()
+    public void Both_clients_and_their_spot_apis_resolve()
     {
-        var services = new ServiceCollection();
+        using var provider = new ServiceCollection().AddBitvavo().BuildServiceProvider();
 
-        InvokeAddBitvavo(services);
-
-        var sp = services.BuildServiceProvider();
-        sp.GetService<IBitvavoRestClient>().ShouldNotBeNull();
+        provider.GetRequiredService<IBitvavoRestClient>().SpotApi.ShouldNotBeNull();
+        provider.GetRequiredService<IBitvavoSocketClient>().SpotApi.ShouldNotBeNull();
+        provider.GetRequiredService<IBitvavoRestClientSpotApi>().ShouldNotBeNull();
+        provider.GetRequiredService<IBitvavoSocketClientSpotApi>().ShouldNotBeNull();
     }
 
     [Fact]
-    public void AddBitvavo_RegistersIBitvavoSocketClient()
+    public void Named_arguments_bind_the_rest_and_socket_options_overload()
     {
         var services = new ServiceCollection();
 
-        InvokeAddBitvavo(services);
+        services.AddBitvavo(restOptionsDelegate: o => o.ReceiveWindowMs = 4_000, socketOptionsDelegate: o => o.ReceiveWindowMs = 5_000);
 
-        var sp = services.BuildServiceProvider();
-        sp.GetService<IBitvavoSocketClient>().ShouldNotBeNull();
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<IOptions<BitvavoRestOptions>>().Value.ReceiveWindowMs.ShouldBe(4_000);
+        provider.GetRequiredService<IOptions<BitvavoSocketOptions>>().Value.ReceiveWindowMs.ShouldBe(5_000);
+    }
+
+    /// <summary>
+    /// A consumer's <c>PostConfigure</c> (the execution package makes the rate limiter fail fast that way) runs after every
+    /// <c>Configure</c>, so it must win over the options the registration made.
+    /// </summary>
+    [Fact]
+    public void PostConfigure_wins_over_the_options_of_the_legacy_overload()
+    {
+        var services = new ServiceCollection().AddBitvavo(o => o.ReceiveWindowMs = 8_000, o => o.ReceiveWindowMs = 8_000);
+        services.PostConfigure<BitvavoRestOptions>(o => o.RateLimitingBehaviour = RateLimitingBehaviour.Fail);
+        services.PostConfigure<BitvavoSocketOptions>(o => o.SocketNoDataTimeout = TimeSpan.FromSeconds(11));
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredService<IOptions<BitvavoRestOptions>>().Value.RateLimitingBehaviour.ShouldBe(RateLimitingBehaviour.Fail);
+        provider.GetRequiredService<IOptions<BitvavoSocketOptions>>().Value.SocketNoDataTimeout.ShouldBe(TimeSpan.FromSeconds(11));
+        ((BitvavoRestClientSpotApi)provider.GetRequiredService<IBitvavoRestClient>().SpotApi).ClientOptions.RateLimitingBehaviour
+            .ShouldBe(RateLimitingBehaviour.Fail);
+    }
+
+    /// <summary>
+    /// The factory-made default <c>HttpClient</c> waits 100 s and ignores the library's connection settings; the typed client
+    /// must enforce <see cref="BitvavoRestOptions.RequestTimeout"/>. The wire is the test seam: a transport that never answers.
+    /// </summary>
+    [Fact]
+    public async Task Di_rest_client_timeout_equals_RequestTimeout()
+    {
+        var services = new ServiceCollection().AddBitvavo(o => o.RequestTimeout = TimeSpan.FromMilliseconds(250));
+        services.ConfigureHttpClientDefaults(builder => builder.ConfigurePrimaryHttpMessageHandler(() => new HangingHttpMessageHandler()));
+        services.AddHttpClient(typeof(IBitvavoRestClient).Name).ConfigurePrimaryHttpMessageHandler(() => new HangingHttpMessageHandler());
+        using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IBitvavoRestClient>();
+        using var guard = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        guard.CancelAfter(TimeSpan.FromSeconds(5));
+
+        var watch = Stopwatch.StartNew();
+        var result = await client.SpotApi.ExchangeData.GetServerTimeAsync(guard.Token);
+        watch.Stop();
+
+        result.Success.ShouldBeFalse();
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3), "the 250 ms request timeout must end the call, not the 5 s guard");
     }
 
     [Fact]
-    public void AddBitvavo_WithRestOptions_AppliesConfiguration()
+    public void The_rest_http_handler_is_never_rotated_underneath_the_client()
     {
-        var services = new ServiceCollection();
+        using var provider = new ServiceCollection().AddBitvavo().BuildServiceProvider();
 
-        InvokeAddBitvavo(services, rest: o => o.ReceiveWindowMs = 7_000);
+        var options = provider.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>().Get(typeof(IBitvavoRestClient).Name);
 
-        var sp = services.BuildServiceProvider();
-        var opts = sp.GetRequiredService<IOptions<BitvavoRestOptions>>().Value;
-        opts.ReceiveWindowMs.ShouldBe(7_000);
-    }
-
-    [Fact]
-    public void AddBitvavo_RestClient_IsRegisteredScopedOrTransient_NotSingleton()
-    {
-        var services = new ServiceCollection();
-
-        InvokeAddBitvavo(services);
-
-        // JKorf convention: REST client is per-resolution (Scoped or Transient), not Singleton.
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IBitvavoRestClient));
-        descriptor.ShouldNotBeNull();
-        descriptor!.Lifetime.ShouldNotBe(ServiceLifetime.Singleton);
-    }
-
-    [Fact]
-    public void AddBitvavo_SocketClient_IsRegisteredAsSingleton()
-    {
-        var services = new ServiceCollection();
-
-        InvokeAddBitvavo(services);
-
-        var descriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IBitvavoSocketClient));
-        descriptor.ShouldNotBeNull();
-        descriptor!.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        options.HandlerLifetime.ShouldBe(Timeout.InfiniteTimeSpan);
     }
 }

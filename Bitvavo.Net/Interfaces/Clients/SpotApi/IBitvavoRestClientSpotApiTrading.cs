@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Bitvavo.Net.Enums;
 using Bitvavo.Net.Objects.Models.Spot;
 using CryptoExchange.Net.Objects;
 
@@ -22,7 +23,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// </summary>
     /// <param name="request">Strongly-typed order parameters (market, side, type, quantities, triggers, …).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrder>> PlaceOrderAsync(BitvavoPlaceOrderRequest request, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrder>> PlaceOrderAsync(BitvavoPlaceOrderRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Update a resting limit / trigger order. Either <see cref="BitvavoUpdateOrderRequest.OrderId"/>
@@ -31,7 +32,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// </summary>
     /// <param name="request">Strongly-typed update parameters.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrder>> UpdateOrderAsync(BitvavoUpdateOrderRequest request, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrder>> UpdateOrderAsync(BitvavoUpdateOrderRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Get the current state of a single order.
@@ -41,7 +42,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="orderId">Server-assigned order id. Set this OR <paramref name="clientOrderId"/>.</param>
     /// <param name="clientOrderId">Client-assigned order id. Set this OR <paramref name="orderId"/>.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrder>> GetOrderAsync(string market, string? orderId = null, string? clientOrderId = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrder>> GetOrderAsync(string market, string? orderId = null, string? clientOrderId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Cancel a single order.
@@ -52,7 +53,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="orderId">Server-assigned order id. Set this OR <paramref name="clientOrderId"/>.</param>
     /// <param name="clientOrderId">Client-assigned order id. Set this OR <paramref name="orderId"/>.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrderId>> CancelOrderAsync(string market, long operatorId, string? orderId = null, string? clientOrderId = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrderId>> CancelOrderAsync(string market, long operatorId, string? orderId = null, string? clientOrderId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Cancel all open orders, optionally scoped to a single market.
@@ -61,7 +62,18 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="operatorId">Account-scoped originator id. Required by Bitvavo on every order operation (mandatory since API v2.9.0).</param>
     /// <param name="market">Optional market to scope the cancellation. Null cancels every open order on the account.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(long operatorId, string? market = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAsync(long operatorId, string? market = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Cancel all open orders of one side in a market as a single atomic request: it is processed in strict arrival order and
+    /// executed without interleaving with other operations (weight 100).
+    /// <para><a href="https://docs.bitvavo.com/docs/rest-api/atomic-cancel-orders">Bitvavo API docs</a></para>
+    /// </summary>
+    /// <param name="market">Market whose orders are cancelled. Required.</param>
+    /// <param name="side">Which side to cancel: buy orders or sell orders. Required.</param>
+    /// <param name="operatorId">Account-scoped originator id. Required by Bitvavo on every order operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<HttpResult<IEnumerable<BitvavoOrderId>>> CancelOrdersAtomicAsync(string market, OrderSide side, long operatorId, CancellationToken ct = default);
 
     /// <summary>
     /// List open orders.
@@ -70,7 +82,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="market">Optional market filter (e.g. <c>"ETH-EUR"</c>).</param>
     /// <param name="baseAsset">Optional base-asset filter (e.g. <c>"ETH"</c>) — returns open orders across every market for that base.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrder>>> GetOpenOrdersAsync(string? market = null, string? baseAsset = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoOrder>>> GetOpenOrdersAsync(string? market = null, string? baseAsset = null, CancellationToken ct = default);
 
     /// <summary>
     /// List historical orders (any state) for a single market.
@@ -83,7 +95,7 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="orderIdFrom">Pagination cursor — only return orders with id &gt;= this value.</param>
     /// <param name="orderIdTo">Pagination cursor — only return orders with id &lt;= this value.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrder>>> GetOrderHistoryAsync(
+    Task<HttpResult<IEnumerable<BitvavoOrder>>> GetOrderHistoryAsync(
         string market,
         int? limit = null,
         DateTime? startTime = null,
@@ -102,13 +114,15 @@ public interface IBitvavoRestClientSpotApiTrading
     /// <param name="endTime">Inclusive UTC upper bound.</param>
     /// <param name="tradeIdFrom">Pagination cursor — only return fills with id &gt;= this value.</param>
     /// <param name="tradeIdTo">Pagination cursor — only return fills with id &lt;= this value.</param>
+    /// <param name="tradeId">Deprecated by Bitvavo, which reads it as <paramref name="tradeIdTo"/>: all fills up to this id. Use <paramref name="tradeIdTo"/>.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoFill>>> GetUserTradesAsync(
+    Task<HttpResult<IEnumerable<BitvavoFill>>> GetUserTradesAsync(
         string market,
         int? limit = null,
         DateTime? startTime = null,
         DateTime? endTime = null,
         string? tradeIdFrom = null,
         string? tradeIdTo = null,
+        string? tradeId = null,
         CancellationToken ct = default);
 }

@@ -1,0 +1,66 @@
+# Bitvavo.Net
+
+> Strongly typed .NET client library for the Bitvavo spot REST and WebSocket APIs. Built on CryptoExchange.Net, with Shared API abstractions for exchange-agnostic code.
+
+Bitvavo.Net provides typed REST and WebSocket clients, automatic WebSocket reconnection, client-side rate limiting that follows Bitvavo's two weight budgets, dependency injection, and the standard CryptoExchange.Net result model. REST calls return `HttpResult<T>`, WebSocket subscriptions return `WebSocketResult<UpdateSubscription>`. Package id: `Bitvavo.Net`. Repository version: 0.5.0 (pre-1.0). Targets net8.0, net9.0, net10.0. Bitvavo is spot only: no futures, no margin, no testnet.
+
+## Documentation
+
+- [AGENTS.md](https://github.com/xkqg/Bitvavo.Net/blob/master/AGENTS.md): Usage rules and code patterns for AI assistants, plus the rules for contributing to this repository
+- [Full LLM Context](https://github.com/xkqg/Bitvavo.Net/blob/master/llms-full.txt): Detailed guide with usings, quick starts, API surface, errors, rate limits and pitfalls
+- [AI API Quick Map](https://github.com/xkqg/Bitvavo.Net/blob/master/docs/ai-api-map.md): Intent to client member, HTTP verb and path, auth, rate-limit weight, models, enums, error table
+- [README](https://github.com/xkqg/Bitvavo.Net/blob/master/README.md): Overview, supported features, quick starts, rate limiting, good-to-know list
+- [ARCHITECTURE](https://github.com/xkqg/Bitvavo.Net/blob/master/ARCHITECTURE.md): Layers, REST request path, signing, rate limiting, WebSocket, Shared API, tests, what is not implemented
+- [CHANGELOG](https://github.com/xkqg/Bitvavo.Net/blob/master/CHANGELOG.md): Release history, breaking changes
+- [CONTRIBUTING](https://github.com/xkqg/Bitvavo.Net/blob/master/CONTRIBUTING.md): Build, test, TDD and pull request flow
+- [Bitvavo API documentation](https://docs.bitvavo.com/): The exchange API this library wraps
+- [CryptoExchange.Net documentation](https://cryptoexchange.jkorf.dev): Clients, dependency injection, result handling, Shared APIs
+
+## Examples
+
+- [QuickStart](https://github.com/xkqg/Bitvavo.Net/blob/master/Bitvavo.Net/Examples/QuickStart/Program.cs): Runnable program with dependency injection, one public REST call, one public WebSocket subscription
+- [ReadmeSamples](https://github.com/xkqg/Bitvavo.Net/blob/master/Bitvavo.Net/Examples/ReadmeSamples/ReadmeSamples.cs): The README code samples, compiled with the solution so they match the API
+- [Endpoint contracts](https://github.com/xkqg/Bitvavo.Net/blob/master/Bitvavo.Net.Tests/Clients/SpotApi/BitvavoEndpointContracts.cs): Every REST endpoint with verb, path, query, body, signed flag and rate-limit weight
+
+## Critical Usage Rules
+
+- Use `BitvavoRestClient` for REST and `BitvavoSocketClient` for WebSocket. With DI: `services.AddBitvavo(...)` (namespace `Bitvavo.Net.Extensions`), then inject `IBitvavoRestClient` and `IBitvavoSocketClient`.
+- Never call Bitvavo with raw `HttpClient` or `ClientWebSocket`.
+- Install with `dotnet add package Bitvavo.Net --prerelease` (pre-1.0, as in the README).
+- Credentials: `new BitvavoCredentials(apiKey, apiSecret)` on the `ApiCredentials` option. Never hardcode or commit keys.
+- REST surface: `restClient.SpotApi.{ExchangeData, Account, Trading, Funding, Report, Institutional}`. Socket surface: `socketClient.SpotApi.{ExchangeData, Account}`. Shared API: `SpotApi.SharedApi`.
+- Always check `.Success` before reading `.Data`. `.Error.ErrorType` is the mapped CryptoExchange.Net `ErrorType` (90 Bitvavo error codes are mapped).
+- Markets are `BASE-QUOTE`, uppercase, dash: `ETH-EUR`.
+- Every order operation needs an operator id (`long`). A `clientOrderId` must be a UUID.
+- Only `BitvavoEnvironment.Live` exists. No testnet, no validate-only order flag: every order call is live.
+- Error 109 (`ErrorType.Timeout`, not transient): the operation may have happened. Read the order back before retrying.
+- A WebSocket subscribe counts as successful once it is sent. Bitvavo sends no per-subscription acknowledgment.
+- Public WebSocket streams: candles and trades. Private `account` channel: order and fill events, subscribed per market.
+- Rate limiting: one static, settable limiter per process, `BitvavoExchange.RateLimiter` (namespace `Bitvavo.Net.Objects.Internal`). Two budgets of 1000 weight per minute: signed requests and public requests.
+- Shared API: `IBitvavoSharedApiClient` offers `GetCapability<T>()`, `GetCapabilities<T>()` and `Discover()` over both transports. Bitvavo specifics travel as exchange parameters: `OperatorId` (`long`), `Markets` (`string[]`), optional `TriggerReference`.
+- `AddBitvavo(o => o.ApiCredentials = ...)` with an untyped lambda configures only the REST client at language version C# 13 or later (the default of net9.0+ projects; at C# 12, the net8.0 default, the library-options overload is picked). Use `(BitvavoOptions o) => ...` or configuration to configure both clients at every language version.
+- Never invent member names. The public surface is `Bitvavo.Net/Interfaces/Clients/`.
+
+## Not implemented
+
+- Public WebSocket ticker, ticker24h and book channels
+- Local order book (`SymbolOrderBook`) and trackers
+- Multi-user client provider
+- WebSocket request/response actions
+- Balance subscription (Bitvavo has no balance event)
+- Batch orders (Bitvavo has no endpoint)
+- Futures, margin, testnet (Bitvavo is spot only)
+
+## Contributing rules
+
+- TDD: failing test first. 0 warnings and 0 errors on net8.0, net9.0, net10.0.
+- Always braces on control flow. No static Helper/Util classes (use extension methods or generics). No tuples (use `readonly record struct`).
+- XML docs on public members. English only. One version number: `<Version>` in `Bitvavo.Net/Bitvavo.Net.csproj`.
+- Extend the Shared API with one partial file per capability (see AGENTS.md).
+- Build: `dotnet build Bitvavo.Net.slnx`. Test: `dotnet run --project Bitvavo.Net.Tests -f net10.0` (xunit v3 executable; `dotnet test` runs 0 tests on SDK 10).
+
+## Reference
+
+- [Source](https://github.com/xkqg/Bitvavo.Net)
+- [NuGet package](https://www.nuget.org/packages/Bitvavo.Net)
+- [CryptoExchange.Net base library](https://github.com/JKorf/CryptoExchange.Net)

@@ -28,7 +28,7 @@ public sealed class BitvavoSocketClient : BaseSocketClient<BitvavoEnvironment, B
         : base(loggerFactory, "Bitvavo")
     {
         Initialize(options.Value);
-        SpotApi = AddApiClient(new BitvavoSocketClientSpotApi(_logger, options.Value));
+        SpotApi = AddApiClient(new BitvavoSocketClientSpotApi(loggerFactory, options.Value));
     }
 
     /// <summary>Set the default options used by every new <see cref="BitvavoSocketClient"/>.</summary>

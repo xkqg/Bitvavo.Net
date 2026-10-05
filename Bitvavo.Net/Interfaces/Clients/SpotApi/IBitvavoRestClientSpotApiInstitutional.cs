@@ -25,7 +25,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// </summary>
     /// <param name="label">Optional description of the subaccount (up to 100 characters).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccount>> CreateSubaccountAsync(string? label = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoSubaccount>> CreateSubaccountAsync(string? label = null, CancellationToken ct = default);
 
     /// <summary>
     /// List the subaccounts under the main account, paginated by page number.
@@ -34,7 +34,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="page">One-based page number to return.</param>
     /// <param name="maxItems">Maximum number of subaccounts per page.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccountList>> GetSubaccountsAsync(int? page = null, int? maxItems = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoSubaccountList>> GetSubaccountsAsync(int? page = null, int? maxItems = null, CancellationToken ct = default);
 
     /// <summary>
     /// Transfer an asset between the main account and a subaccount.
@@ -42,7 +42,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// </summary>
     /// <param name="request">Transfer parameters (subaccount, direction, asset, amount).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccountTransfer>> CreateTransferAsync(BitvavoCreateTransferRequest request, CancellationToken ct = default);
+    Task<HttpResult<BitvavoSubaccountTransfer>> CreateTransferAsync(BitvavoCreateTransferRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Get a single subaccount transfer by its Bitvavo transfer identifier.
@@ -50,7 +50,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// </summary>
     /// <param name="transferId">Bitvavo-assigned transfer identifier (UUID). Required.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccountTransfer>> GetTransferAsync(string transferId, CancellationToken ct = default);
+    Task<HttpResult<BitvavoSubaccountTransfer>> GetTransferAsync(string transferId, CancellationToken ct = default);
 
     /// <summary>
     /// List subaccount transfers for a single subaccount, optionally filtered by time window.
@@ -62,7 +62,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="endTime">Inclusive UTC upper bound.</param>
     /// <param name="limit">Maximum entries (1–1000, default 25).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccountTransferList>> GetTransfersAsync(
+    Task<HttpResult<BitvavoSubaccountTransferList>> GetTransfersAsync(
         string subaccountId,
         string? clientRequestId = null,
         DateTime? startTime = null,
@@ -78,7 +78,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="subaccountId">Identifier (UUID) of the subaccount. Null returns the main account balance.</param>
     /// <param name="symbol">Optional asset filter. Null returns every asset with a balance &gt; 0.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoSubaccountBalances>> GetSubaccountBalancesAsync(
+    Task<HttpResult<BitvavoSubaccountBalances>> GetSubaccountBalancesAsync(
         string? subaccountId = null,
         string? symbol = null,
         CancellationToken ct = default);
@@ -94,7 +94,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="maxItems">Maximum number of items per page (1–100).</param>
     /// <param name="type">Optional transaction-type filter (e.g. <c>"buy"</c>, <c>"deposit"</c>).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoTransactionHistory>> GetSubaccountTransactionHistoryAsync(
+    Task<HttpResult<BitvavoTransactionHistory>> GetSubaccountTransactionHistoryAsync(
         string? subaccountId = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
@@ -112,7 +112,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="market">Optional market filter (e.g. <c>"BTC-EUR"</c>).</param>
     /// <param name="baseAsset">Optional base-asset filter (e.g. <c>"BTC"</c>).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrder>>> GetSubaccountOpenOrdersAsync(
+    Task<HttpResult<IEnumerable<BitvavoOrder>>> GetSubaccountOpenOrdersAsync(
         string? subaccountId = null,
         string? market = null,
         string? baseAsset = null,
@@ -124,7 +124,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// </summary>
     /// <param name="request">Cancel parameters (market, order id, operator id, optional subaccount).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrderId>> CancelSubaccountOrderAsync(BitvavoSubaccountCancelOrderRequest request, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrderId>> CancelSubaccountOrderAsync(BitvavoSubaccountCancelOrderRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Cancel all open orders on a subaccount (or the main account), optionally scoped to a
@@ -135,7 +135,7 @@ public interface IBitvavoRestClientSpotApiInstitutional
     /// <param name="subaccountId">Identifier (UUID) of the subaccount. Null cancels on the main account.</param>
     /// <param name="market">Optional market to scope the cancellation.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoOrderId>>> CancelSubaccountOrdersAsync(
+    Task<HttpResult<IEnumerable<BitvavoOrderId>>> CancelSubaccountOrdersAsync(
         long operatorId,
         string? subaccountId = null,
         string? market = null,

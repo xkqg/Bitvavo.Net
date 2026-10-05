@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Bitvavo.Net.Interfaces.Clients.SpotApi;
+using Bitvavo.Net.Objects.Internal;
 using Bitvavo.Net.Objects.Models.Spot;
 using CryptoExchange.Net.Objects;
 
@@ -23,48 +24,60 @@ internal sealed class BitvavoRestClientSpotApiAccount : IBitvavoRestClientSpotAp
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<BitvavoAccountInfo>> GetAccountInfoAsync(CancellationToken ct = default)
+    public Task<HttpResult<BitvavoAccountInfo>> GetAccountInfoAsync(CancellationToken ct = default)
     {
         // weight assumed — Bitvavo docs page did not state it; conservative default
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/account", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
+        var request = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, "v2/account", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoAccountInfo>(request, parameters: null, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<IEnumerable<BitvavoBalance>>> GetBalancesAsync(string? symbol = null, CancellationToken ct = default)
+    public Task<HttpResult<IEnumerable<BitvavoBalance>>> GetBalancesAsync(string? symbol = null, CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.AddOptional("symbol", symbol);
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("symbol", symbol);
 
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/balance", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
+        var request = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, "v2/balance", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
         return _baseClient.SendAsync<IEnumerable<BitvavoBalance>>(request, parameters, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<BitvavoMarketFee>> GetTradingFeesAsync(string? market = null, CancellationToken ct = default)
+    public Task<HttpResult<BitvavoMarketFee>> GetTradingFeesAsync(string? market = null, string? quote = null, CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.AddOptional("market", market);
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("market", market);
+        parameters.Add("quote", quote);
 
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/account/fees", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
+        var request = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, "v2/account/fees", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoMarketFee>(request, parameters, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
+    public Task<HttpResult<IEnumerable<BitvavoStakingBalance>>> GetStakingBalanceAsync(string? symbol = null, CancellationToken ct = default)
+    {
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("symbol", symbol);
+
+        var request = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, "v2/stakingBalance", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
+        return _baseClient.SendAsync<IEnumerable<BitvavoStakingBalance>>(request, parameters, ct);
+    }
+
+    /// <inheritdoc />
+    public Task<HttpResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
         int codGroupId, int expiryAfterSeconds, CancellationToken ct = default)
     {
-        var body = new ParameterCollection();
+        var body = new Parameters(BitvavoExchange.ParameterSerializationSettings);
         body.Add("codGroupId", codGroupId);
         body.Add("expiryAfterSeconds", expiryAfterSeconds);
-        // Intentionally NOT gated — the CoD heartbeat must never be client-side rate-limited; its
-        // ~30 weight/min is absorbed by RateLimitGate's ClientSafetyMargin. (P1-bis mini-council 2026-05-20.)
-        var request = _definitions.GetOrCreate(HttpMethod.Post, "v2/cancelOrdersAfter", true);
+        // Documented weight 5, deliberately NOT counted — the CoD heartbeat must never be client-side rate-limited: a refused
+        // heartbeat lets the timer expire and Bitvavo cancels the group's orders. At one call per ~30 s its weight (~10/min) fits in
+        // the headroom the limiter leaves free (10 % of the budget).
+        var request = _definitions.GetOrCreate(HttpMethod.Post, _baseClient.BaseAddress, "v2/cancelOrdersAfter", true);
         return _baseClient.SendAsync<BitvavoCancelOrdersAfter>(request, queryParameters: null, bodyParameters: body, ct);
     }
 
     /// <inheritdoc />
-    public Task<WebCallResult<BitvavoTransactionHistory>> GetTransactionHistoryAsync(
+    public Task<HttpResult<BitvavoTransactionHistory>> GetTransactionHistoryAsync(
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? page = null,
@@ -72,15 +85,15 @@ internal sealed class BitvavoRestClientSpotApiAccount : IBitvavoRestClientSpotAp
         string? type = null,
         CancellationToken ct = default)
     {
-        var parameters = new ParameterCollection();
-        parameters.AddOptionalMilliseconds("fromDate", fromDate);
-        parameters.AddOptionalMilliseconds("toDate", toDate);
-        parameters.AddOptional("page", page);
-        parameters.AddOptional("maxItems", maxItems);
-        parameters.AddOptional("type", type);
+        var parameters = new Parameters(BitvavoExchange.ParameterSerializationSettings);
+        parameters.Add("fromDate", fromDate);
+        parameters.Add("toDate", toDate);
+        parameters.Add("page", page);
+        parameters.Add("maxItems", maxItems);
+        parameters.Add("type", type);
 
-        // weight assumed — Bitvavo docs page did not state it; conservative default
-        var request = _definitions.GetOrCreate(HttpMethod.Get, "v2/account/history", BitvavoRestClientSpotApi.RateLimitGate, weight: 5, authenticated: true);
+        // Bitvavo documents weight 1 for the transaction history ("Get transaction history").
+        var request = _definitions.GetOrCreate(HttpMethod.Get, _baseClient.BaseAddress, "v2/account/history", BitvavoRestClientSpotApi.RateLimitGate, weight: 1, authenticated: true);
         return _baseClient.SendAsync<BitvavoTransactionHistory>(request, parameters, ct);
     }
 }

@@ -23,7 +23,7 @@ namespace Bitvavo.Net.Objects.Internal;
 ///   <item><term>timestamp</term><description>Unix milliseconds.</description></item>
 ///   <item><term>METHOD</term><description>HTTP verb upper-case.</description></item>
 ///   <item><term>url</term><description><c>"/" + path</c> with optional <c>"?" + queryString</c>.</description></item>
-///   <item><term>body</term><description>Exact JSON body for POST/PUT, empty for GET/DELETE.</description></item>
+///   <item><term>body</term><description>The exact JSON body that is sent — present whenever the request's parameters travel in the body (POST, PUT, the institutional DELETEs), empty otherwise.</description></item>
 /// </list>
 /// HMAC-SHA256 hex (lower-case) of that payload is the signature.
 /// </remarks>
@@ -39,18 +39,30 @@ internal sealed class BitvavoAuthenticationProvider : AuthenticationProvider<Bit
         _serializer = new SystemTextJsonMessageSerializer(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
+    /// <summary>
+    /// The one signing point of the provider (REST and WebSocket): HMAC-SHA256 over <paramref name="payload"/> with the
+    /// API secret, as lower-case hex — the form Bitvavo's documentation specifies for both signature examples.
+    /// </summary>
+    /// <param name="payload"><c>timestamp + METHOD + path[?query] + body</c> for REST, <c>timestamp + "GET/v2/websocket"</c> for the WebSocket authenticate action.</param>
+    /// <returns>The 64-character lower-case hex signature.</returns>
+    internal string Sign(string payload) => SignHMACSHA256(payload, SignOutputType.Hex)!.ToLowerInvariant();
+
     /// <inheritdoc />
     public override void ProcessRequest(RestApiClient apiClient, RestRequestConfiguration request)
     {
-        if (!request.Authenticated) return;
+        if (!request.RequestDefinition.Authenticated)
+        {
+            return;
+        }
 
         var timestamp = GetMillisecondTimestamp(apiClient, false);
-        var method = request.Method.Method.ToUpperInvariant();
-        var path = "/" + request.Path.TrimStart('/');
+        var method = request.RequestDefinition.Method.Method.ToUpperInvariant();
+        var path = "/" + request.RequestDefinition.Path.TrimStart('/');
 
+        // The signature covers the body that is sent, whichever verb carries it: the framework decides per request where the
+        // parameters travel (ParameterPosition). Deciding by verb would leave a DELETE with a JSON body signed without it.
         var body = string.Empty;
-        if ((request.Method == HttpMethod.Post || request.Method == HttpMethod.Put)
-            && request.BodyParameters is { Count: > 0 } bodyParams)
+        if (request.ParameterPosition == HttpMethodParameterPosition.InBody && request.BodyParameters is { Count: > 0 } bodyParams)
         {
             body = GetSerializedBody(_serializer, bodyParams);
             request.SetBodyContent(body);
@@ -59,8 +71,7 @@ internal sealed class BitvavoAuthenticationProvider : AuthenticationProvider<Bit
         var query = request.GetQueryString(urlEncode: true);
         var url = string.IsNullOrEmpty(query) ? path : path + "?" + query;
 
-        var payload = timestamp + method + url + body;
-        var signature = SignHMACSHA256(payload, SignOutputType.Hex)!.ToLowerInvariant();
+        var signature = Sign(timestamp + method + url + body);
 
         var headers = request.Headers!;
         headers["Bitvavo-Access-Key"] = Key!;
@@ -73,17 +84,19 @@ internal sealed class BitvavoAuthenticationProvider : AuthenticationProvider<Bit
     /// Build the JSON payload for Bitvavo's WebSocket authentication. Wire shape:
     /// <code>{ "action": "authenticate", "key": "...", "signature": "&lt;hex&gt;", "timestamp": &lt;ms&gt;, "window": &lt;ms&gt; }</code>
     /// Signature = HMAC-SHA256-hex(secret, timestamp + "GET" + "/v2/websocket"). Per
-    /// Bitvavo's WebSocket Introduction docs.
+    /// Bitvavo's WebSocket Introduction docs. The timestamp comes from the same framework source as REST signing
+    /// (<c>GetMillisecondTimestamp</c>), so the API client's time offset applies to both transports.
     /// </summary>
+    /// <param name="apiClient">The socket API client whose time offset aligns the signed timestamp with Bitvavo's clock.</param>
     /// <param name="receiveWindowMs">
     /// Optional override for the per-request receive window. Defaults to the value passed
     /// to this provider's constructor (typically <see cref="Options.BitvavoSocketOptions.ReceiveWindowMs"/>).
     /// </param>
-    public Dictionary<string, object> BuildSocketAuth(int? receiveWindowMs = null)
+    public Dictionary<string, object> BuildSocketAuth(SocketApiClient apiClient, int? receiveWindowMs = null)
     {
         var window = receiveWindowMs ?? _receiveWindowMs;
-        var timestamp = (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()).ToString(CultureInfo.InvariantCulture);
-        var signature = SignHMACSHA256(timestamp + "GET/v2/websocket", SignOutputType.Hex)!.ToLowerInvariant();
+        var timestamp = GetMillisecondTimestamp(apiClient, false);
+        var signature = Sign(timestamp + "GET/v2/websocket");
 
         return new Dictionary<string, object>
         {

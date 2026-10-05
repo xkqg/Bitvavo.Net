@@ -11,9 +11,8 @@ using Xunit;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Drives Phase 3A (add <c>OneWeek</c> + <c>OneMonth</c>) and Phase 3B (replace
-/// <see cref="System.Text.Json.Serialization.JsonStringEnumConverter"/> with
-/// <see cref="EnumConverter{T}"/> for [Map]-driven wire symmetry).
+/// Pins the wire tokens of <see cref="KlineInterval"/>, including <c>OneWeek</c> and <c>OneMonth</c>, and that
+/// <see cref="EnumConverter{T}"/> reads and writes them symmetrically from the <c>[Map]</c> attributes.
 ///
 /// Bitvavo wire format note: minute/hour/day intervals are lowercase, but <c>"1W"</c>
 /// (week) and <c>"1M"</c> (month) are capital — capital <c>M</c> is needed to disambiguate

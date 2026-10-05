@@ -12,6 +12,7 @@ using Bitvavo.Net.Objects.Internal;
 using Bitvavo.Net.Objects.Options;
 using CryptoExchange.Net.Authentication;
 using CryptoExchange.Net.Objects;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using Xunit;
@@ -47,30 +48,40 @@ public class BitvavoAuthenticationProviderTests
         return new AuthProviderContext(provider, apiClient);
     }
 
+    /// <summary>
+    /// A request configuration as the framework hands it to the provider. <paramref name="position"/> defaults to the
+    /// framework's own rule: POST and PUT carry their parameters in the body, every other verb in the URI.
+    /// </summary>
     private static RestRequestConfiguration BuildConfig(
         string path,
         HttpMethod method,
         bool authenticated,
-        ParameterCollection? query = null,
-        ParameterCollection? body = null)
+        Parameters? query = null,
+        Parameters? body = null,
+        HttpMethodParameterPosition? position = null)
     {
-        var def = new RequestDefinition(path, method) { Authenticated = authenticated };
+        var def = new RequestDefinition("https://api.bitvavo.com", path, method) { Authenticated = authenticated };
         return new RestRequestConfiguration(
             def,
-            "https://api.bitvavo.com",
-            query ?? new ParameterCollection(),
-            body ?? new ParameterCollection(),
+            query ?? new Parameters(ParameterSerializationSettings.Default),
+            body ?? new Parameters(ParameterSerializationSettings.Default),
             new Dictionary<string, string>(),
-            ArrayParametersSerialization.Array,
-            HttpMethodParameterPosition.InUri,
+            position ?? (method == HttpMethod.Post || method == HttpMethod.Put ? HttpMethodParameterPosition.InBody : HttpMethodParameterPosition.InUri),
             RequestBodyFormat.Json);
+    }
+
+    private static BitvavoSocketClientSpotApi CreateSocketApi()
+    {
+        var options = new BitvavoSocketOptions { ApiCredentials = new BitvavoCredentials(TestKey, TestSecret) };
+        var client = new BitvavoSocketClient(new LoggerFactory(), Options.Create(options));
+        return (BitvavoSocketClientSpotApi)client.SpotApi;
     }
 
     private static string HmacSha256Hex(string secret, string payload)
     {
         using var h = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
         var hash = h.ComputeHash(Encoding.UTF8.GetBytes(payload));
-        return Convert.ToHexStringLower(hash);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     // ── tests ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +95,27 @@ public class BitvavoAuthenticationProviderTests
         provider.ProcessRequest(apiClient, cfg);
 
         cfg.Headers!.Count.ShouldBe(0);
+        cfg.GetBodyContent().ShouldBeNull();
+    }
+
+    [Fact]
+    public void Credentials_without_a_spot_credential_give_a_provider_with_an_empty_key()
+    {
+        var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials());
+
+        provider.Key.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void ProcessRequest_signs_the_url_only_for_a_body_request_without_body_parameters()
+    {
+        var (provider, apiClient) = CreateProvider();
+        var cfg = BuildConfig("v2/cancelOrdersAfter", HttpMethod.Post, authenticated: true);
+
+        provider.ProcessRequest(apiClient, cfg);
+
+        var timestamp = cfg.Headers!["Bitvavo-Access-Timestamp"];
+        cfg.Headers["Bitvavo-Access-Signature"].ShouldBe(HmacSha256Hex(TestSecret, timestamp + "POST/v2/cancelOrdersAfter"));
         cfg.GetBodyContent().ShouldBeNull();
     }
 
@@ -134,7 +166,7 @@ public class BitvavoAuthenticationProviderTests
     public void ProcessRequest_signing_payload_for_GET_with_query_matches_HMAC()
     {
         var (provider, apiClient) = CreateProvider();
-        var query = new ParameterCollection();
+        var query = new Parameters(ParameterSerializationSettings.Default);
         query.Add("market", "ETH-EUR");
         query.Add("limit", 10);
         var cfg = BuildConfig("v2/orders", HttpMethod.Get, authenticated: true, query: query);
@@ -154,7 +186,7 @@ public class BitvavoAuthenticationProviderTests
     public void ProcessRequest_signing_payload_for_POST_with_body_matches_HMAC_and_pins_body()
     {
         var (provider, apiClient) = CreateProvider();
-        var body = new ParameterCollection();
+        var body = new Parameters(ParameterSerializationSettings.Default);
         body.Add("market", "ETH-EUR");
         body.Add("side", "buy");
         body.Add("orderType", "limit");
@@ -176,13 +208,38 @@ public class BitvavoAuthenticationProviderTests
         cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
     }
 
+    /// <summary>
+    /// Bitvavo's institutional cancel endpoints are DELETEs whose parameters travel in the JSON body. The signature covers the
+    /// body when — and only when — the parameters travel in the body; the pinned body is the exact string that is sent.
+    /// </summary>
+    [Fact]
+    public void ProcessRequest_signs_and_pins_the_body_of_a_DELETE_whose_parameters_travel_in_the_body()
+    {
+        var (provider, apiClient) = CreateProvider();
+        var body = new Parameters(ParameterSerializationSettings.Default);
+        body.Add("market", "BTC-EUR");
+        body.Add("orderId", "abc");
+        body.Add("operatorId", 7);
+        body.Add("subaccountId", "sub-1");
+        var cfg = BuildConfig("v2/institutional/subaccounts/order", HttpMethod.Delete, authenticated: true, body: body, position: HttpMethodParameterPosition.InBody);
+
+        provider.ProcessRequest(apiClient, cfg);
+
+        var ts = cfg.Headers!["Bitvavo-Access-Timestamp"];
+        var pinnedBody = cfg.GetBodyContent();
+        pinnedBody.ShouldNotBeNull();
+        pinnedBody!.ShouldContain("\"subaccountId\":\"sub-1\"");
+
+        cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(HmacSha256Hex(TestSecret, ts + "DELETE/v2/institutional/subaccounts/order" + pinnedBody));
+    }
+
     [Fact]
     public void ProcessRequest_uses_empty_body_for_GET_even_if_BodyParameters_non_empty()
     {
         // Defensive: GET requests must sign with empty body even if the framework
         // accidentally populates BodyParameters — Bitvavo's spec is "body = empty for GET/DELETE".
         var (provider, apiClient) = CreateProvider();
-        var stowaway = new ParameterCollection();
+        var stowaway = new Parameters(ParameterSerializationSettings.Default);
         stowaway.Add("dummy", "x");
         var cfg = BuildConfig("v2/account", HttpMethod.Get, authenticated: true, body: stowaway);
 
@@ -203,7 +260,7 @@ public class BitvavoAuthenticationProviderTests
     {
         var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials(TestKey, TestSecret));
 
-        var msg = provider.BuildSocketAuth();
+        var msg = provider.BuildSocketAuth(CreateSocketApi());
 
         msg["action"].ShouldBe("authenticate");
         msg["key"].ShouldBe(TestKey);
@@ -217,7 +274,7 @@ public class BitvavoAuthenticationProviderTests
     {
         var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials(TestKey, TestSecret));
 
-        var msg = provider.BuildSocketAuth();
+        var msg = provider.BuildSocketAuth(CreateSocketApi());
 
         var ts = msg["timestamp"].ToString();
         var expectedSig = HmacSha256Hex(TestSecret, ts + "GET/v2/websocket");
@@ -228,19 +285,46 @@ public class BitvavoAuthenticationProviderTests
     public void BuildSocketAuth_honours_explicit_window_override()
     {
         var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials(TestKey, TestSecret), receiveWindowMs: 30_000);
+        var socketApi = CreateSocketApi();
 
-        var defaultMsg = provider.BuildSocketAuth();
-        var overrideMsg = provider.BuildSocketAuth(receiveWindowMs: 60_000);
+        var defaultMsg = provider.BuildSocketAuth(socketApi);
+        var overrideMsg = provider.BuildSocketAuth(socketApi, receiveWindowMs: 60_000);
 
         defaultMsg["window"].ShouldBe(30_000);
         overrideMsg["window"].ShouldBe(60_000);
+    }
+
+    /// <summary>
+    /// The WebSocket authenticate frame signs the same server-aligned time REST signing uses: CryptoExchange.Net's one
+    /// timestamp source, shifted by the API client's time offset. A local clock that runs ahead of Bitvavo's therefore still
+    /// lands inside the receive window of the <c>authenticate</c> action. No clock stand-in: the offset is registered the way
+    /// the framework does it (<c>UpdateTimeOffset</c>), then read back.
+    /// </summary>
+    [Fact]
+    public void Socket_auth_timestamp_uses_the_time_offset()
+    {
+        var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials(TestKey, TestSecret));
+        var socketApi = CreateSocketApi();
+        socketApi.UpdateTimeOffset(DateTime.UtcNow.AddSeconds(-45));
+        var offset = socketApi.GetTimeOffset();
+        offset.ShouldNotBeNull();
+        offset!.Value.ShouldNotBe(TimeSpan.Zero);
+
+        var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var msg = provider.BuildSocketAuth(socketApi);
+        var after = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // The 5 ms slack covers the millisecond truncation of the unix conversion; a missing offset is ~45 000 ms off.
+        var shift = (long)offset.Value.TotalMilliseconds;
+        ((long)msg["timestamp"]).ShouldBeInRange(before - shift - 5, after - shift + 5);
+        msg["signature"].ShouldBe(HmacSha256Hex(TestSecret, msg["timestamp"] + "GET/v2/websocket"));
     }
 
     [Fact]
     public void ProcessRequest_uses_empty_body_for_DELETE_even_if_BodyParameters_non_empty()
     {
         var (provider, apiClient) = CreateProvider();
-        var stowaway = new ParameterCollection();
+        var stowaway = new Parameters(ParameterSerializationSettings.Default);
         stowaway.Add("dummy", "x");
         var cfg = BuildConfig("v2/order", HttpMethod.Delete, authenticated: true, body: stowaway);
 
@@ -252,5 +336,20 @@ public class BitvavoAuthenticationProviderTests
 
         cfg.Headers!["Bitvavo-Access-Signature"].ShouldBe(expectedSig);
         cfg.GetBodyContent().ShouldBeNull();
+    }
+
+    /// <summary>
+    /// The two signature examples Bitvavo publishes (REST introduction "Create a signature", WebSocket introduction
+    /// "Step 1: Create a signature"; secret <c>bitvavo</c> in both). The vendor's own numbers are the oracle — no clock
+    /// and no stand-in: the pure payload signer is called directly.
+    /// </summary>
+    [Theory]
+    [InlineData("1548172481125POST/v2/order{\"market\":\"BTC-EUR\",\"side\":\"buy\",\"price\":\"5000\",\"amount\":\"1.23\",\"orderType\":\"limit\"}", "44d022723a20973a18f7ee97398b9fdd405d2d019c8d39e24b8cc0dcb39ca016")]
+    [InlineData("1548175200641GET/v2/websocket", "653fc0505431c63a043273da4bd2f0927eae83948d796084f313e5d1131b0d6f")]
+    public void Sign_matches_the_signature_vectors_published_in_the_Bitvavo_docs(string payload, string expectedSignature)
+    {
+        var provider = new BitvavoAuthenticationProvider(new BitvavoCredentials("any-key", "bitvavo"));
+
+        provider.Sign(payload).ShouldBe(expectedSignature);
     }
 }

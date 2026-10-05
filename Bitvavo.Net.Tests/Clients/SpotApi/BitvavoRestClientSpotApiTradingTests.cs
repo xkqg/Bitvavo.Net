@@ -442,6 +442,6 @@ public class BitvavoRestClientSpotApiTradingTests
     private static string HmacSha256Hex(string secret, string payload)
     {
         using var h = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
-        return Convert.ToHexStringLower(h.ComputeHash(Encoding.UTF8.GetBytes(payload)));
+        return Convert.ToHexString(h.ComputeHash(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
     }
 }

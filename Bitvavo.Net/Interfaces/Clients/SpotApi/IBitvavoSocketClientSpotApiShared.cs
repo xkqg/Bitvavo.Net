@@ -5,18 +5,11 @@ using CryptoExchange.Net.SharedApis;
 namespace Bitvavo.Net.Interfaces.Clients.SpotApi;
 
 /// <summary>
-/// Aggregate CryptoExchange.Net Shared-API surface for the Bitvavo Spot WebSocket client.
+/// [V1] Aggregate of the legacy CryptoExchange.Net Shared WebSocket interfaces Bitvavo implements, reachable via
+/// <see cref="IBitvavoSocketClientSpotApi.SharedClient"/>; new code uses <see cref="IBitvavoSocketClientSpotSharedApi"/>.
 /// <para>
-/// Composes every Shared socket sub-interface Bitvavo implements into a single type so
-/// consumers can program against the exchange-agnostic Shared layer with one reference
-/// (mirroring <c>IKrakenSocketClientSpotApiShared</c>). Reachable via
-/// <see cref="IBitvavoSocketClientSpotApi.SharedClient"/>.
-/// </para>
-/// <para>
-/// <see cref="IBalanceSocketClient"/> is intentionally omitted: Bitvavo's private
-/// <c>account</c> channel emits only <c>order</c> and <c>fill</c> events — no balance
-/// snapshot or balance-delta stream exists to back a balance subscription. This is a
-/// correct ISP-driven omission, not a gap.
+/// There is no balance subscription: Bitvavo's private <c>account</c> channel emits only <c>order</c> and <c>fill</c> events,
+/// no balance snapshot or delta, so nothing could back one. An interface-segregation omission, not a gap.
 /// </para>
 /// </summary>
 public interface IBitvavoSocketClientSpotApiShared :
@@ -24,5 +17,18 @@ public interface IBitvavoSocketClientSpotApiShared :
     ITradeSocketClient,
     ISpotOrderSocketClient,
     IUserTradeSocketClient
+{
+}
+
+/// <summary>
+/// [V2] Aggregate of the Shared WebSocket capabilities Bitvavo implements, reachable via
+/// <see cref="IBitvavoSocketClientSpotApi.SharedApi"/>. The private subscriptions (spot orders, user trades) are subscribed per
+/// market: the markets travel in the request's exchange parameters under the <c>Markets</c> key.
+/// </summary>
+public interface IBitvavoSocketClientSpotSharedApi :
+    ISubscribeKlinesSocket,
+    ISubscribeTradesSocket,
+    ISubscribeSpotOrdersSocket,
+    ISubscribeUserTradesSocket
 {
 }

@@ -29,4 +29,8 @@ public record BitvavoOrderBook
     /// <summary>Sell orders, sorted by ascending price (best ask first).</summary>
     [JsonPropertyName("asks")]
     public IReadOnlyList<BitvavoOrderBookEntry> Asks { get; init; } = new List<BitvavoOrderBookEntry>();
+
+    /// <summary>Time of the snapshot in unix nanoseconds (the wire field <c>timestamp</c>).</summary>
+    [JsonPropertyName("timestamp")]
+    public long? TimestampNs { get; init; }
 }

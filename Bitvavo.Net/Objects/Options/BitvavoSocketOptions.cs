@@ -43,4 +43,10 @@ public class BitvavoSocketOptions : SocketExchangeOptions<BitvavoEnvironment, Bi
         targetOptions.ReceiveWindowMs = ReceiveWindowMs;
         return targetOptions;
     }
+
+    /// <summary>
+    /// An independent copy, for a client of its own: what that client does to its options (<c>SetOptions</c>) stays with it
+    /// instead of reaching the options of the container and of every client created after it.
+    /// </summary>
+    internal BitvavoSocketOptions Copy() => Set(new BitvavoSocketOptions());
 }

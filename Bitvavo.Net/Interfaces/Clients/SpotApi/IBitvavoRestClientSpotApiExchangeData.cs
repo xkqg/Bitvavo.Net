@@ -23,7 +23,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// </para>
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoMarket>>> GetMarketsAsync(CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoMarket>>> GetMarketsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Get historical candles (klines) for a given market and interval.
@@ -37,7 +37,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <param name="startTime">Inclusive UTC lower bound — fetches candles starting from this time.</param>
     /// <param name="endTime">Inclusive UTC upper bound.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoKline>>> GetKlinesAsync(
+    Task<HttpResult<IEnumerable<BitvavoKline>>> GetKlinesAsync(
         string market,
         KlineInterval interval,
         int? limit = null,
@@ -51,7 +51,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <para><a href="https://docs.bitvavo.com/docs/rest-api/get-server-time">Bitvavo API docs</a></para>
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoServerTime>> GetServerTimeAsync(CancellationToken ct = default);
+    Task<HttpResult<BitvavoServerTime>> GetServerTimeAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Get all Bitvavo-supported assets, optionally filtered to a single symbol.
@@ -59,7 +59,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// </summary>
     /// <param name="symbol">Optional symbol filter (e.g. <c>"BTC"</c>).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoAsset>>> GetAssetsAsync(string? symbol = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoAsset>>> GetAssetsAsync(string? symbol = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the most-recent traded price for one or all markets.
@@ -67,7 +67,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// </summary>
     /// <param name="market">Optional market filter (e.g. <c>"ETH-EUR"</c>). Null returns every market.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoTickerPrice>>> GetTickerPricesAsync(string? market = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoTickerPrice>>> GetTickerPricesAsync(string? market = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the top-of-book quote (best bid + best ask) for one or all markets.
@@ -75,7 +75,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// </summary>
     /// <param name="market">Optional market filter.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoTickerBook>>> GetTickerBookAsync(string? market = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoTickerBook>>> GetTickerBookAsync(string? market = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the 24-hour rolling OHLCV + best-quote stats for one or all markets.
@@ -83,7 +83,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// </summary>
     /// <param name="market">Optional market filter.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoTicker24h>>> GetTicker24hAsync(string? market = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoTicker24h>>> GetTicker24hAsync(string? market = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the order-book snapshot for a single market.
@@ -92,7 +92,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <param name="market">Market identifier. Required.</param>
     /// <param name="depth">Maximum entries per side (1–1000, default 1000).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoOrderBook>> GetOrderBookAsync(string market, int? depth = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoOrderBook>> GetOrderBookAsync(string market, int? depth = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the public trade tape for a single market — distinct from the user's own
@@ -106,7 +106,7 @@ public interface IBitvavoRestClientSpotApiExchangeData
     /// <param name="tradeIdFrom">Pagination cursor — only return trades with id &gt;= this value.</param>
     /// <param name="tradeIdTo">Pagination cursor — only return trades with id &lt;= this value.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoPublicTrade>>> GetPublicTradesAsync(
+    Task<HttpResult<IEnumerable<BitvavoPublicTrade>>> GetPublicTradesAsync(
         string market,
         int? limit = null,
         DateTime? startTime = null,

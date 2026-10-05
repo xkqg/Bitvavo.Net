@@ -21,7 +21,7 @@ public interface IBitvavoRestClientSpotApiFunding
     /// </summary>
     /// <param name="symbol">Asset symbol (e.g. <c>"BTC"</c>, <c>"EUR"</c>). Required.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoDepositAddress>> GetDepositAddressAsync(string symbol, CancellationToken ct = default);
+    Task<HttpResult<BitvavoDepositAddress>> GetDepositAddressAsync(string symbol, CancellationToken ct = default);
 
     /// <summary>
     /// Get the deposit history for the account, optionally filtered by asset and time range.
@@ -32,7 +32,7 @@ public interface IBitvavoRestClientSpotApiFunding
     /// <param name="startTime">Inclusive UTC lower bound.</param>
     /// <param name="endTime">Inclusive UTC upper bound.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoDepositHistoryEntry>>> GetDepositHistoryAsync(
+    Task<HttpResult<IEnumerable<BitvavoDepositHistoryEntry>>> GetDepositHistoryAsync(
         string? symbol = null,
         int? limit = null,
         DateTime? startTime = null,
@@ -48,7 +48,7 @@ public interface IBitvavoRestClientSpotApiFunding
     /// <param name="startTime">Inclusive UTC lower bound.</param>
     /// <param name="endTime">Inclusive UTC upper bound.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoWithdrawalHistoryEntry>>> GetWithdrawalHistoryAsync(
+    Task<HttpResult<IEnumerable<BitvavoWithdrawalHistoryEntry>>> GetWithdrawalHistoryAsync(
         string? symbol = null,
         int? limit = null,
         DateTime? startTime = null,
@@ -68,5 +68,17 @@ public interface IBitvavoRestClientSpotApiFunding
     /// </summary>
     /// <param name="request">Withdrawal parameters (symbol, amount, destination, optional fee handling).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoWithdrawalResult>> WithdrawAsync(BitvavoWithdrawRequest request, CancellationToken ct = default);
+    Task<HttpResult<BitvavoWithdrawalResult>> WithdrawAsync(BitvavoWithdrawRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Withdraw crypto to an address on a named blockchain network (weight 25). The accepted withdrawal comes back with a
+    /// server-issued id and the network fee; an <see cref="BitvavoCryptoWithdrawRequest.IdempotencyKey"/> makes a retry safe.
+    /// <para>
+    /// <strong>Caution:</strong> this endpoint moves funds, with the same API-key-only safety gate as <see cref="WithdrawAsync"/>.
+    /// </para>
+    /// <para><a href="https://docs.bitvavo.com/docs/rest-api/withdraw-crypto-assets">Bitvavo API docs</a></para>
+    /// </summary>
+    /// <param name="request">Withdrawal parameters (asset, network, address, amount, optional fee handling, idempotency key, memo).</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<HttpResult<BitvavoCryptoWithdrawal>> WithdrawCryptoAsync(BitvavoCryptoWithdrawRequest request, CancellationToken ct = default);
 }

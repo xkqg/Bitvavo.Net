@@ -32,9 +32,14 @@ public interface IBitvavoRestClientSpotApi : IRestApiClient
     IBitvavoRestClientSpotApiInstitutional Institutional { get; }
 
     /// <summary>
-    /// The exchange-agnostic CryptoExchange.Net Shared-API surface for Bitvavo Spot REST.
-    /// Use this to program against the Shared abstractions common to every
-    /// CryptoExchange.Net client library (mirrors <c>IKrakenRestClientSpotApi.SharedClient</c>).
+    /// [V1] The legacy shared REST client: the exchange-independent CryptoExchange.Net interfaces (klines, orders, balances, …) as
+    /// they were before the Shared API. Kept for compatibility; for new implementations use <see cref="SharedApi"/>.
     /// </summary>
     IBitvavoRestClientSpotApiShared SharedClient { get; }
+
+    /// <summary>
+    /// [V2] The aggregate Shared API. Shared APIs give every CryptoExchange.Net exchange library one exchange-independent contract;
+    /// <see cref="CryptoExchange.Net.SharedApis.ISharedApi.Capabilities"/> lists what Bitvavo supports. The same instance as <see cref="SharedClient"/>.
+    /// </summary>
+    IBitvavoRestClientSpotSharedApi SharedApi { get; }
 }

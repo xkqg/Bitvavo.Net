@@ -26,7 +26,7 @@ public interface IBitvavoSocketClientSpotApiAccount
     /// <param name="markets">Markets to subscribe to (e.g. <c>["ETH-EUR"]</c>).</param>
     /// <param name="onMessage">Per-event callback.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<CallResult<UpdateSubscription>> SubscribeToOrderUpdatesAsync(
+    Task<WebSocketResult<UpdateSubscription>> SubscribeToOrderUpdatesAsync(
         string[] markets,
         Action<DataEvent<BitvavoStreamOrderUpdate>> onMessage,
         CancellationToken ct = default);
@@ -40,7 +40,7 @@ public interface IBitvavoSocketClientSpotApiAccount
     /// <param name="markets">Markets to subscribe to.</param>
     /// <param name="onMessage">Per-fill callback.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<CallResult<UpdateSubscription>> SubscribeToFillUpdatesAsync(
+    Task<WebSocketResult<UpdateSubscription>> SubscribeToFillUpdatesAsync(
         string[] markets,
         Action<DataEvent<BitvavoStreamFillEvent>> onMessage,
         CancellationToken ct = default);

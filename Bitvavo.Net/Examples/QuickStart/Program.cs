@@ -5,8 +5,9 @@
 //   2. one public REST call (markets list)
 //   3. one public WebSocket subscription (BTC-EUR 1h candles)
 //
-// Run: dotnet run --project Examples/QuickStart
-// Live API only — no credentials required for these endpoints.
+// Run (from the repository root): dotnet run --project Bitvavo.Net/Examples/QuickStart
+// Live API only — no credentials required for these endpoints. The code samples of the README are in
+// Examples/ReadmeSamples (compiled, never run).
 
 using Bitvavo.Net.Enums;
 using Bitvavo.Net.Extensions;
@@ -32,7 +33,9 @@ if (!marketsResult.Success)
 }
 Console.WriteLine($"Loaded {marketsResult.Data.Count()} markets; first three:");
 foreach (var m in marketsResult.Data.Take(3))
+{
     Console.WriteLine($"  {m.Market} (status={m.Status}, base={m.BaseAsset}, quote={m.QuoteAsset})");
+}
 
 // --- 2) Public WebSocket: subscribe to one BTC-EUR 1h candle update, exit on first ---
 var seen = new TaskCompletionSource<DateTime>();
@@ -44,7 +47,9 @@ var sub = await sock.SpotApi.ExchangeData.SubscribeToKlineUpdatesAsync(
         var candleEvent = ev.Data;
         var latest = candleEvent.Candle.LastOrDefault();
         if (latest is not null)
+        {
             Console.WriteLine($"  [WS] {candleEvent.Market} {candleEvent.Interval} O={latest.OpenPrice} C={latest.ClosePrice}");
+        }
         seen.TrySetResult(DateTime.UtcNow);
     });
 

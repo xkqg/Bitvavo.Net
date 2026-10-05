@@ -21,6 +21,7 @@ namespace Bitvavo.Net.Objects.Models.Spot;
 /// <param name="SelfTradePrevention">New self-trade-prevention rule.</param>
 /// <param name="PostOnly">New post-only flag.</param>
 /// <param name="ResponseRequired">If false, Bitvavo returns a slimmer ack-only response.</param>
+/// <param name="AmountRemaining">New base-asset quantity still outstanding (reduces the order without losing its queue position).</param>
 public record BitvavoUpdateOrderRequest(
     string Market,
     long OperatorId,
@@ -33,4 +34,5 @@ public record BitvavoUpdateOrderRequest(
     TimeInForce? TimeInForce = null,
     SelfTradePrevention? SelfTradePrevention = null,
     bool? PostOnly = null,
-    bool? ResponseRequired = null);
+    bool? ResponseRequired = null,
+    decimal? AmountRemaining = null);

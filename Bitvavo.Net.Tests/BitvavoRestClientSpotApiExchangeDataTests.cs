@@ -52,11 +52,11 @@ public class BitvavoRestClientSpotApiExchangeDataTests
         var markets = result.Data.ToList();
         markets.Count.ShouldBe(2);
         markets[0].Market.ShouldBe("ETH-EUR");
-        markets[0].Status.ShouldBe("trading");
+        markets[0].Status.ShouldBe(BitvavoMarketStatus.Trading);
         markets[0].BaseAsset.ShouldBe("ETH");
         markets[0].QuoteAsset.ShouldBe("EUR");
         markets[0].OrderTypes.ShouldBe(new[] { "market", "limit" });
-        markets[1].Status.ShouldBe("halted");
+        markets[1].Status.ShouldBe(BitvavoMarketStatus.Halted);
     }
 
     [Fact]

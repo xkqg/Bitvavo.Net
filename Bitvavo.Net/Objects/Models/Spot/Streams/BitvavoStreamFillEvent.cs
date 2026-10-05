@@ -60,4 +60,12 @@ public record BitvavoStreamFillEvent
     /// <summary>Currency the fee was paid in.</summary>
     [JsonPropertyName("feeCurrency")]
     public string FeeCurrency { get; init; } = string.Empty;
+
+    /// <summary>The <c>operatorId</c> of the request that placed the order (required by Bitvavo's AsyncAPI specification).</summary>
+    [JsonPropertyName("operatorId")]
+    public long? OperatorId { get; init; }
+
+    /// <summary>Server timestamp of the fill in unix nanoseconds (<see cref="Timestamp"/> has millisecond resolution).</summary>
+    [JsonPropertyName("timestampNs")]
+    public long? TimestampNs { get; init; }
 }

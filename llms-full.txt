@@ -1,0 +1,952 @@
+# Bitvavo.Net 0.5.0 full LLM context — copy-paste guide to the Bitvavo REST and WebSocket client: exact API surface, quick starts, errors, rate limits, pitfalls.
+
+> Detailed reference for generating correct C#/.NET code with Bitvavo.Net. Routing tables with HTTP verb, path, auth and weight per method: `docs/ai-api-map.md`. Member lists: `Bitvavo.Net/Interfaces/Clients/**`. Design: `ARCHITECTURE.md`.
+
+## Facts
+
+- NuGet package `Bitvavo.Net`, version 0.5.0 (pre-1.0: the API can still change between minor versions). Repository https://github.com/xkqg/Bitvavo.Net. MIT.
+- Targets net8.0, net9.0, net10.0. Built on CryptoExchange.Net 13.1.0 (structure of Kraken.Net 8.6.0, both load in one process).
+- Bitvavo is spot only. No futures, no margin, no testnet: `BitvavoEnvironment.Live` is the only environment (REST `https://api.bitvavo.com`, WebSocket `wss://ws.bitvavo.com/v2/`).
+- Coverage matches Bitvavo REST API docs v2.10.0. All REST paths sit under `/v2/`.
+- Results: REST `HttpResult<T>`, subscriptions `WebSocketResult<UpdateSubscription>`. Protocol errors are results, not exceptions.
+
+## Golden rules for AI code generation
+
+- REST: `BitvavoRestClient` (`IBitvavoRestClient`). WebSocket: `BitvavoSocketClient` (`IBitvavoSocketClient`). Exchange-agnostic: Shared API (`SpotApi.SharedApi`, `IBitvavoSharedApiClient`).
+- Never raw `HttpClient` against Bitvavo, never hand-made HMAC. Signing, timestamp, access window and rate limiting are built in.
+- Credentials: `new BitvavoCredentials(apiKey, apiSecret)` (not generic `ApiCredentials`). Public endpoints need none.
+- Always branch on `result.Success` before reading `result.Data`.
+- Every order operation needs an `operatorId` (`long`). Every `clientOrderId` must be a UUID (`Guid.NewGuid().ToString()`).
+- Prices must be a multiple of `BitvavoMarket.TickSize`. `PricePrecision` is null on every live market: never use it.
+- Fee rates are fractions (`0.0015` = 0.15 %). The Shared API reports percentages.
+- Amounts and prices are `decimal` in C# and JSON strings on the wire. `DateTime` is UTC (unix milliseconds on the wire).
+- Public endpoints are never signed and count against the per-IP budget; signed endpoints count against the per-account budget.
+- Prefer dependency injection for long-running services. With `new`, keep one client and dispose it at shutdown. Do not create a client per request.
+- Store subscriptions and unsubscribe on shutdown. No `.Result` or `.Wait()` on async methods. Pass `ct` by name.
+- Do not invent members. If unsure, read `Bitvavo.Net/Interfaces/Clients/**` or `docs/ai-api-map.md`.
+
+## Install
+
+```bash
+dotnet add package Bitvavo.Net
+```
+
+## Usings
+
+Samples omit usings and assume `ImplicitUsings` (System, System.Linq, System.Threading, System.Threading.Tasks) with top-level statements. `apiKey`, `apiSecret`, `credentials`, `configuration`, `request` and `services` stand for your own values. The usual set:
+
+```csharp
+using Bitvavo.Net;                         // BitvavoCredentials, BitvavoEnvironment
+using Bitvavo.Net.Clients;                 // BitvavoRestClient, BitvavoSocketClient
+using Bitvavo.Net.Enums;                   // OrderSide, OrderType, TimeInForce, KlineInterval, TriggerReference, ...
+using Bitvavo.Net.Extensions;              // services.AddBitvavo(...)
+using Bitvavo.Net.Interfaces.Clients;      // IBitvavoRestClient, IBitvavoSocketClient, IBitvavoSharedApiClient
+using Bitvavo.Net.Interfaces.Clients.SpotApi;   // IBitvavoRestClientSpotSharedApi, IBitvavoSocketClientSpotSharedApi
+using Bitvavo.Net.Objects.Internal;        // BitvavoExchange, BitvavoRateLimiters (public types in a namespace called Internal)
+using Bitvavo.Net.Objects.Models.Spot;     // BitvavoPlaceOrderRequest, BitvavoOrder, ...
+using Bitvavo.Net.Objects.Options;         // BitvavoOptions, BitvavoRestOptions, BitvavoSocketOptions
+using CryptoExchange.Net.Authentication;   // HMACCredential
+using CryptoExchange.Net.Objects;          // HttpResult<T>, WebSocketResult<T>, Error, RateLimitingBehaviour
+using CryptoExchange.Net.Objects.Errors;   // ErrorType
+using CryptoExchange.Net.Objects.Sockets;  // UpdateSubscription, DataEvent<T>
+using CryptoExchange.Net.RateLimiting;     // RateLimitAdmission
+using CryptoExchange.Net.SharedApis;       // Shared API types
+using Microsoft.Extensions.DependencyInjection;
+```
+
+## Main API surface
+
+```text
+BitvavoRestClient (IBitvavoRestClient)
+  .SpotApi (IBitvavoRestClientSpotApi)
+    .ExchangeData      public market data
+    .Account           info, balances, fees, staking balance, ledger, cancel-on-disconnect
+    .Trading           place, update, get, cancel, cancel all, atomic cancel, open orders, history, own trades
+    .Funding           deposit address, deposit and withdrawal history, withdraw, crypto withdraw
+    .Report            MiCA trade and book reports (public)
+    .Institutional     subaccounts, transfers, per-subaccount queries
+    .SharedApi         Shared API V2 (32 capabilities)
+    .SharedClient      Shared API V1 (legacy interfaces, same instance)
+
+BitvavoSocketClient (IBitvavoSocketClient)
+  .SpotApi (IBitvavoSocketClientSpotApi)
+    .ExchangeData      candles, trades (public)
+    .Account           order events, fill events (private account channel)
+    .SharedApi         Shared API V2 (klines, trades, spot orders, user trades)
+    .SharedClient      Shared API V1 (same instance)
+
+IBitvavoSharedApiClient     SpotRest + SpotSocket + GetCapability<T>() + Discover()
+```
+
+## Quick start 1 — REST, public data
+
+```csharp
+using var client = new BitvavoRestClient();
+
+// Markets: status, tick size, decimals, order limits
+var markets = await client.SpotApi.ExchangeData.GetMarketsAsync();
+if (!markets.Success)
+{
+    Console.WriteLine($"{markets.Error?.ErrorType}: {markets.Error?.Message}");
+    return;
+}
+
+foreach (var m in markets.Data.Where(x => x.Status == BitvavoMarketStatus.Trading).Take(5))
+{
+    Console.WriteLine($"{m.Market} tick={m.TickSize} qtyDecimals={m.QuantityDecimals} minBase={m.MinOrderInBaseAsset} minQuote={m.MinOrderInQuoteAsset}");
+}
+
+// 24 h ticker of one market (weight 1; without a market weight 25). A market filter returns a collection of one:
+// Bitvavo answers a single JSON object and the library reads it into IEnumerable<BitvavoTicker24h>.
+var ticker = await client.SpotApi.ExchangeData.GetTicker24hAsync("BTC-EUR");
+var t = ticker.Success ? ticker.Data.FirstOrDefault(x => x.Market == "BTC-EUR") : null;
+Console.WriteLine($"last={t?.Last} bid={t?.Bid} ask={t?.Ask} volume={t?.Volume}");
+
+// Order book snapshot, 5 levels per side
+var book = await client.SpotApi.ExchangeData.GetOrderBookAsync("BTC-EUR", depth: 5);
+if (book.Success)
+{
+    Console.WriteLine($"nonce={book.Data.Nonce} bid={book.Data.Bids.FirstOrDefault()?.Price} ask={book.Data.Asks.FirstOrDefault()?.Price}");
+}
+
+// 24 hourly candles, newest first
+var candles = await client.SpotApi.ExchangeData.GetKlinesAsync("BTC-EUR", KlineInterval.OneHour, limit: 24);
+if (candles.Success)
+{
+    foreach (var k in candles.Data)
+    {
+        Console.WriteLine($"{k.OpenTime:u} O={k.OpenPrice} H={k.HighPrice} L={k.LowPrice} C={k.ClosePrice} V={k.Volume}");
+    }
+}
+```
+
+More public calls: `GetTickerPricesAsync(market?)` (last price), `GetTickerBookAsync(market?)` (best bid and ask, weight 1 — use it instead of a WebSocket ticker, which does not exist here), `GetPublicTradesAsync(market, limit?, startTime?, endTime?, tradeIdFrom?, tradeIdTo?)` (weight 5, window at most 24 h), `GetAssetsAsync(symbol?)`, `GetServerTimeAsync()`.
+
+## Quick start 2 — REST, signed
+
+```csharp
+using var client = new BitvavoRestClient(o => o.ApiCredentials = new BitvavoCredentials(apiKey, apiSecret));
+
+// Balances (weight 5). Available + InOrder = total.
+var balances = await client.SpotApi.Account.GetBalancesAsync();
+if (balances.Success)
+{
+    foreach (var b in balances.Data)
+    {
+        Console.WriteLine($"{b.Symbol} available={b.Available} inOrder={b.InOrder}");
+    }
+}
+
+// Fee tier of a market: fractions, 0.0015 = 0.15 %
+var fees = await client.SpotApi.Account.GetTradingFeesAsync(market: "ETH-EUR");
+if (fees.Success)
+{
+    Console.WriteLine($"maker={fees.Data.Maker:P3} taker={fees.Data.Taker:P3}");
+}
+
+const long operatorId = 1;                       // integer that identifies the trader or bot; required on every order operation
+var clientOrderId = Guid.NewGuid().ToString();   // UUID, unique per market
+
+// Place a post-only limit buy
+var placed = await client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(
+    Market: "ETH-EUR",
+    Side: OrderSide.Buy,
+    OrderType: OrderType.Limit,
+    OperatorId: operatorId,
+    Amount: 0.01m,
+    Price: 1500.00m,
+    TimeInForce: TimeInForce.GoodTillCanceled,
+    PostOnly: true,
+    ClientOrderId: clientOrderId));
+if (!placed.Success)
+{
+    Console.WriteLine($"{placed.Error?.ErrorType} code={placed.Error?.ErrorCode}: {placed.Error?.Message}");
+    return;
+}
+
+var order = placed.Data;
+Console.WriteLine($"{order.OrderId} {order.Status} remaining={order.AmountRemaining}");
+
+// Read it back, by order id or by client order id
+var byId = await client.SpotApi.Trading.GetOrderAsync("ETH-EUR", orderId: order.OrderId);
+var byClientId = await client.SpotApi.Trading.GetOrderAsync("ETH-EUR", clientOrderId: clientOrderId);
+
+// Change the price (limit and untriggered trigger orders only)
+var updated = await client.SpotApi.Trading.UpdateOrderAsync(new BitvavoUpdateOrderRequest(
+    Market: "ETH-EUR", OperatorId: operatorId, OrderId: order.OrderId, Price: 1499.50m));
+
+// Cancel it
+var cancelled = await client.SpotApi.Trading.CancelOrderAsync("ETH-EUR", operatorId, orderId: order.OrderId);
+```
+
+Other order shapes, all through `BitvavoPlaceOrderRequest`:
+
+```csharp
+// Market buy sized by a quote budget (25 EUR). Amount and AmountQuote are mutually exclusive.
+await client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(
+    "ETH-EUR", OrderSide.Buy, OrderType.Market, operatorId, AmountQuote: 25m));
+
+// Market sell sized in the base asset
+await client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(
+    "ETH-EUR", OrderSide.Sell, OrderType.Market, operatorId, Amount: 0.01m));
+
+// Stop-loss limit: waits in status AwaitingTrigger until the trigger price is reached, then places a limit order
+await client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(
+    "ETH-EUR", OrderSide.Sell, OrderType.StopLossLimit, operatorId,
+    Amount: 0.01m, Price: 1390m, TriggerAmount: 1400m,
+    TriggerType: TriggerType.Price, TriggerReference: TriggerReference.LastTrade));
+```
+
+Lists and bulk calls:
+
+```csharp
+var open = await client.SpotApi.Trading.GetOpenOrdersAsync("ETH-EUR");                    // weight 5; without a market weight 100
+var history = await client.SpotApi.Trading.GetOrderHistoryAsync("ETH-EUR", limit: 50);    // weight 5; also lists still-open orders
+var fills = await client.SpotApi.Trading.GetUserTradesAsync("ETH-EUR", limit: 50);        // weight 5; window at most 24 h
+var cancelAll = await client.SpotApi.Trading.CancelOrdersAsync(operatorId, "ETH-EUR");    // weight 25 with a market, 100 without
+var atomic = await client.SpotApi.Trading.CancelOrdersAtomicAsync("ETH-EUR", OrderSide.Buy, operatorId); // weight 100
+```
+
+## Quick start 3 — WebSocket, public streams
+
+```csharp
+using var socketClient = new BitvavoSocketClient();
+
+// One market, one interval. Each event carries an array of candles (usually one).
+var candles = await socketClient.SpotApi.ExchangeData.SubscribeToKlineUpdatesAsync(
+    "BTC-EUR",
+    KlineInterval.OneMinute,
+    update =>
+    {
+        var latest = update.Data.Candle.LastOrDefault();
+        Console.WriteLine($"{update.Data.Market} {update.Data.Interval} close={latest?.ClosePrice}");
+    });
+if (!candles.Success)
+{
+    Console.WriteLine(candles.Error);
+    return;
+}
+
+// Several markets on one subscription: dispatch on update.Data.Market
+var trades = await socketClient.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync(
+    new[] { "BTC-EUR", "ETH-EUR" },
+    update => Console.WriteLine($"{update.Data.Market} {update.Data.Side} {update.Data.Amount} @ {update.Data.Price}"));
+
+Console.ReadLine();
+
+// Close one subscription, or all of them
+await socketClient.UnsubscribeAsync(candles.Data);
+await socketClient.UnsubscribeAllAsync();
+```
+
+Public channels that exist: `candles` and `trades`. A WebSocket ticker, ticker24h or book channel does not exist in this library: poll REST (`GetTickerBookAsync`, `GetTicker24hAsync`, `GetOrderBookAsync`).
+
+## Quick start 4 — WebSocket, private account channel
+
+```csharp
+using var socketClient = new BitvavoSocketClient(o => o.ApiCredentials = new BitvavoCredentials(apiKey, apiSecret));
+using var cts = new CancellationTokenSource();
+
+// Order state changes of the listed markets
+var orders = await socketClient.SpotApi.Account.SubscribeToOrderUpdatesAsync(
+    new[] { "ETH-EUR" },
+    update => Console.WriteLine(
+        $"order {update.Data.OrderId} {update.Data.Status} filled={update.Data.FilledAmount}/{update.Data.Amount} exec={update.Data.ExecutionType}"),
+    cts.Token);
+
+// Own fills of the listed markets
+var fills = await socketClient.SpotApi.Account.SubscribeToFillUpdatesAsync(
+    new[] { "ETH-EUR" },
+    update => Console.WriteLine(
+        $"fill {update.Data.FillId} {update.Data.Side} {update.Data.Amount} @ {update.Data.Price} fee={update.Data.Fee} {update.Data.FeeCurrency} taker={update.Data.Taker}"));
+
+if (!orders.Success || !fills.Success)
+{
+    Console.WriteLine(orders.Error ?? fills.Error);
+}
+
+Console.ReadLine();
+cts.Cancel();   // closes the order subscription
+```
+
+- The channel emits `order` and `fill` events only. There are no balance events and no balance subscription: read balances with `Account.GetBalancesAsync`.
+- The channel is subscribed per market; `markets` is required. Both members share Bitvavo's `account` channel and differ by the event type they route.
+- The library sends Bitvavo's `authenticate` action (key, HMAC-SHA256 of `timestamp + "GET/v2/websocket"`, timestamp, window) before the first private subscribe on a connection. Without credentials the subscribe fails with `NoApiCredentialsError`.
+- A subscribe counts as successful once it is sent: Bitvavo acknowledges subscribes only in an aggregated event. A wrong market name is not reported through `Success`, and Bitvavo `error` events are not routed. Validate market names against `GetMarketsAsync`.
+- Bitvavo gives no ordering guarantee between the `order` event and the `fill` event of one trade. After a reconnect, read the state back over REST (`GetOpenOrdersAsync`, `GetUserTradesAsync`).
+- `DataEvent<T>`: `update.Data`, `update.ReceiveTime`, `update.Symbol`, `update.StreamId`, `update.OriginalData`.
+
+## Quick start 5 — dependency injection
+
+```csharp
+var services = new ServiceCollection();
+services.AddLogging();
+
+// One options object for the whole library: credentials reach REST and socket
+services.AddBitvavo((BitvavoOptions o) =>
+{
+    o.ApiCredentials = new BitvavoCredentials(apiKey, apiSecret);
+    o.Rest.RequestTimeout = TimeSpan.FromSeconds(10);
+    o.Rest.AutoTimestamp = true;
+    o.SharedApi.PreferredTransport = SharedTransport.Rest;
+});
+
+await using var provider = services.BuildServiceProvider();
+var rest = provider.GetRequiredService<IBitvavoRestClient>();
+var socket = provider.GetRequiredService<IBitvavoSocketClient>();
+var shared = provider.GetRequiredService<IBitvavoSharedApiClient>();
+```
+
+Constructor injection:
+
+```csharp
+public sealed class OrderService(IBitvavoRestClient rest)
+{
+    public async Task<string?> BuyAsync(string market, decimal amount, decimal price, CancellationToken ct)
+    {
+        var result = await rest.SpotApi.Trading.PlaceOrderAsync(
+            new BitvavoPlaceOrderRequest(market, OrderSide.Buy, OrderType.Limit, OperatorId: 1,
+                Amount: amount, Price: price, ClientOrderId: Guid.NewGuid().ToString()),
+            ct);
+        return result.Success ? result.Data.OrderId : null;
+    }
+}
+```
+
+The three registrations, exactly:
+
+```csharp
+// 1) Legacy overload: optional Action<BitvavoRestOptions> and Action<BitvavoSocketOptions>
+services.AddBitvavo();
+services.AddBitvavo(
+    restOptionsDelegate: o => { o.ApiCredentials = credentials; o.AutoTimestamp = true; },
+    socketOptionsDelegate: o => o.ApiCredentials = credentials);
+
+// 2) From configuration, for example the section "Bitvavo" of appsettings.json
+services.AddBitvavo(configuration.GetSection("Bitvavo"));
+
+// 3) Library-wide options (explicit lambda type)
+services.AddBitvavo((BitvavoOptions o) => o.ApiCredentials = credentials);
+```
+
+appsettings.json for registration 2 (keys are relative to the bound section; the environment name ignores case, an unknown name throws at registration):
+
+```json
+{
+  "Bitvavo": {
+    "Environment": { "Name": "Live" },
+    "ApiCredentials": { "Spot": { "Key": "your-key", "Secret": "your-secret" } },
+    "Rest": { "RequestTimeout": "00:00:10", "ReceiveWindowMs": 10000 },
+    "Socket": { "ReceiveWindowMs": 10000 },
+    "SharedApi": { "PreferredTransport": "Rest" }
+  }
+}
+```
+
+Lifetimes and behaviour:
+
+- `IBitvavoRestClient` is transient, on a typed `HttpClient` whose timeout is `RequestTimeout`. `IBitvavoRestClientSpotApi` is transient.
+- `IBitvavoSocketClient` is a singleton (one shared WebSocket pool) unless `BitvavoOptions.SocketClientLifeTime` is set (library-wide overload only). `IBitvavoSocketClientSpotApi` follows it.
+- Every overload registers options through the options pipeline, so an application `PostConfigure` runs last and wins:
+
+```csharp
+services.PostConfigure<BitvavoRestOptions>(o => o.RateLimitingBehaviour = RateLimitingBehaviour.Fail);
+services.PostConfigure<BitvavoSocketOptions>(o => o.SocketNoDataTimeout = TimeSpan.FromSeconds(30));
+```
+
+- Also resolvable: `IBitvavoSharedApiClient`, `IBitvavoRestClientSpotSharedApi`, `IBitvavoSocketClientSpotSharedApi` and every Shared capability interface (V2 and V1).
+- Trap: `services.AddBitvavo(o => o.ApiCredentials = credentials)` binds the REST overload (language version C# 13 and later; at C# 12, the net8.0 default, the library-wide overload is picked and both clients get the credentials) and the socket client gets NO credentials. For both transports write `(BitvavoOptions o) => ...` as in registration 3, or use both delegates of registration 1. A lambda that touches `Rest`, `Socket`, `SharedApi` or `SocketClientLifeTime` binds the library-wide overload by itself.
+
+## Quick start 6 — Shared API client, `GetCapability`
+
+The Shared API is CryptoExchange.Net's exchange-independent contract. Each capability is its own interface; `Discover()` lists what Bitvavo registers; transport preference decides which transport answers when both could.
+
+```csharp
+async Task Run(IBitvavoSharedApiClient shared)
+{
+    var info = shared.Discover();                      // capabilities per transport
+
+    // Lookup by capability type; null when Bitvavo does not register it
+    var klines = shared.GetCapability<IGetKlines>();
+    if (klines is null)
+    {
+        return;
+    }
+
+    var result = await klines.Capability.GetKlinesAsync(
+        new GetKlinesRequest(new SharedSymbol(TradingMode.Spot, "ETH", "EUR"), SharedKlineInterval.OneHour, limit: 24));
+    if (result.Success)
+    {
+        foreach (var kline in result.Data)
+        {
+            Console.WriteLine($"{kline.OpenTime:g} close={kline.ClosePrice}");
+        }
+    }
+}
+```
+
+`GetCapability<T>(SharedTransport? transport = null)` returns a lookup result (`Capability`, `Transport`, `Exchange`, `Options`) or null. The transport-neutral interfaces (`IGetKlines`) answer `IExchangeCallResult<T>`; the REST twins (`IGetKlinesRest`) answer `HttpResult<T>`. A typed lookup reference selects the REST twin:
+
+```csharp
+var klinesRest = shared.GetCapability(SharedCapabilities.Klines.GetKlines.Rest);   // null when not registered
+var restResult = klinesRest is null
+    ? null
+    : await klinesRest.Capability.GetKlinesAsync(new GetKlinesRequest(new SharedSymbol(TradingMode.Spot, "ETH", "EUR"), SharedKlineInterval.OneHour, limit: 24));
+```
+
+To skip the lookup, use the typed Shared object directly (`shared` is the `IBitvavoSharedApiClient` resolved in Quick start 5):
+
+```csharp
+IBitvavoRestClientSpotSharedApi api = shared.SpotRest;   // or restClient.SpotApi.SharedApi
+
+var symbol = new SharedSymbol(TradingMode.Spot, "ETH", "EUR");      // market ETH-EUR
+var operatorParameter = new ExchangeParameters(
+    new ExchangeParameter(BitvavoExchange.ExchangeName, "OperatorId", 1L));   // value type is long: 1L
+
+var placed = await api.PlaceSpotOrderAsync(new PlaceSpotOrderRequest(
+    symbol,
+    SharedOrderSide.Buy,
+    SharedOrderType.Limit,
+    SharedQuantity.Base(0.01m),
+    price: 1500m,
+    timeInForce: SharedTimeInForce.GoodTillCanceled,
+    clientOrderId: api.GenerateClientOrderId(),          // a UUID
+    exchangeParameters: operatorParameter));
+if (!placed.Success)
+{
+    Console.WriteLine(placed.Error);
+    return;
+}
+
+var order = await api.GetSpotOrderAsync(new GetOrderRequest(symbol, placed.Data.Id));
+var cancelled = await api.CancelSpotOrderAsync(new CancelOrderRequest(symbol, placed.Data.Id, operatorParameter));
+
+// Or set the operator id once for every request of this exchange
+api.SetDefaultExchangeParameter("OperatorId", 1L);
+// ... and later: api.ResetDefaultExchangeParameters();
+```
+
+Exchange parameters Bitvavo needs (the Shared requests have no field for them), keyed by exchange `BitvavoExchange.ExchangeName` ("Bitvavo"):
+
+| Name | Value type | Needed by |
+|---|---|---|
+| `OperatorId` | `long`, required | place, cancel, cancel by client id, cancel all, cancel all of a symbol, edit, edit by client id, place trigger order, cancel trigger order |
+| `Markets` | `string[]`, required | `SubscribeToSpotOrderUpdatesAsync`, `SubscribeToUserTradeUpdatesAsync` (the account channel is subscribed per market) |
+| `TriggerReference` | `TriggerReference` enum, optional (default `LastTrade`) | `PlaceSpotTriggerOrderAsync` |
+
+A request that lacks a required parameter is rejected with `ArgumentError` before anything is sent. Wrong value type: use `1L`, not `1`.
+
+Trigger orders (Bitvavo has no trigger endpoint: a trigger order is an ordinary stop-loss or take-profit order that waits in `AwaitingTrigger`):
+
+```csharp
+var triggerParameters = new ExchangeParameters(
+    new ExchangeParameter(BitvavoExchange.ExchangeName, "OperatorId", 1L),
+    new ExchangeParameter(BitvavoExchange.ExchangeName, "TriggerReference", TriggerReference.BestBid));
+
+// Sell 0.01 ETH when the price falls to 1400; with a limit price (1390) the placed order is a limit order, without it a market order
+var stop = await api.PlaceSpotTriggerOrderAsync(new PlaceSpotTriggerOrderRequest(
+    symbol, SharedTriggerPriceDirection.PriceBelow, 1400m, SharedOrderSide.Sell, SharedQuantity.Base(0.01m), 1390m, triggerParameters));
+```
+
+Mapping (assumed, not measured against the live API): sell + `PriceBelow` = stop loss, sell + `PriceAbove` = take profit, buy + `PriceAbove` = stop loss, buy + `PriceBelow` = take profit; with a limit price the `...Limit` order type. Quantity in the quote asset is only valid without a limit price.
+
+Paging through Shared history (`NextPageRequest` of the result is the token of the next call):
+
+```csharp
+PageRequest? next = null;
+do
+{
+    var page = await api.GetClosedSpotOrdersAsync(new GetClosedOrdersRequest(symbol), next);
+    if (!page.Success)
+    {
+        break;
+    }
+
+    foreach (var closed in page.Data)
+    {
+        Console.WriteLine($"{closed.OrderId} {closed.Status}");
+    }
+
+    next = page.NextPageRequest;
+} while (next is not null);
+```
+
+Shared WebSocket (V2). The private ones need the `Markets` exchange parameter:
+
+```csharp
+IBitvavoSocketClientSpotSharedApi sockets = shared.SpotSocket;   // or socketClient.SpotApi.SharedApi
+
+var klineSub = await sockets.SubscribeToKlineUpdatesAsync(
+    new SubscribeKlineRequest(symbol, SharedKlineInterval.OneMinute),      // one symbol only
+    update => Console.WriteLine($"{update.Data.OpenTime:T} close={update.Data.ClosePrice}"));
+
+var tradeSub = await sockets.SubscribeToTradeUpdatesAsync(
+    new SubscribeTradeRequest(symbol),                                     // several symbols allowed
+    update => { foreach (var trade in update.Data) Console.WriteLine($"{trade.Symbol} {trade.Price}"); });
+
+var marketsParameter = new ExchangeParameters(
+    new ExchangeParameter(BitvavoExchange.ExchangeName, "Markets", new[] { "ETH-EUR" }));
+
+var orderSub = await sockets.SubscribeToSpotOrderUpdatesAsync(
+    new SubscribeSpotOrderRequest(marketsParameter),
+    update => { foreach (var o in update.Data) Console.WriteLine($"{o.Symbol} {o.OrderId} {o.Status}"); });
+
+var userTradeSub = await sockets.SubscribeToUserTradeUpdatesAsync(
+    new SubscribeUserTradeRequest(exchangeParameters: marketsParameter),
+    update => { foreach (var u in update.Data) Console.WriteLine($"{u.Symbol} {u.Side} {u.Price}"); });
+
+await sockets.UnsubscribeAllAsync();
+```
+
+REST V2 capabilities (32): `IGetAssetRest`, `IGetAllAssetsRest`, `IGetKlinesRest`, `IGetBalancesRest`, `IGetFeesRest`, `IGetLedgerRest`, `IGetDepositAddressesRest`, `IGetDepositHistoryRest`, `IGetWithdrawalHistoryRest`, `IWithdrawRest`, `IPlaceSpotOrderRest`, `IGetSpotOrderRest`, `IGetSpotOrderByClientOrderIdRest`, `IGetOpenSpotOrdersRest`, `IGetClosedSpotOrdersRest`, `IGetSpotOrderTradesRest`, `IGetSpotUserTradeHistoryRest`, `ICancelSpotOrderRest`, `ICancelSpotOrderByClientOrderIdRest`, `IGetSpotSymbolsRest`, `IGetTickerRest`, `IGetAllTickersRest`, `IGetOrderBookRest`, `IGetBookTickerRest`, `IGetRecentTradesRest`, `ICancelAllSpotOrdersRest`, `ICancelAllSpotSymbolOrdersRest`, `IEditSpotOrderRest`, `IEditSpotOrderByClientOrderIdRest`, `IPlaceSpotTriggerOrderRest`, `IGetSpotTriggerOrderRest`, `ICancelSpotTriggerOrderRest`. WebSocket V2 (4): `ISubscribeKlinesSocket`, `ISubscribeTradesSocket`, `ISubscribeSpotOrdersSocket`, `ISubscribeUserTradesSocket`. Legacy V1 aggregates (same instance): `IBitvavoRestClientSpotApiShared` (14 interfaces) and `IBitvavoSocketClientSpotApiShared` (4), reached through `SpotApi.SharedClient`. Batch orders are absent: Bitvavo has no endpoint.
+
+Shared behaviour worth knowing:
+- Order types: `Limit`, `Market`, `LimitMaker` (limit + post-only). `SharedOrderType.Other` throws `ArgumentException` on place. Time in force: GTC, IOC, FOK. Limit orders take the quantity in the base asset; market orders take base or quote (`SharedQuantity.Base(x)`, `SharedQuantity.Quote(x)`).
+- The by-client-id capabilities (`GetSpotOrderByClientOrderIdAsync`, `CancelSpotOrderByClientOrderIdAsync`, `EditSpotOrderByClientOrderIdAsync`) carry the client order id in the request's `OrderId` field.
+- Edit (`EditOrderRequest`): the new total quantity and/or the new price, at least one; a market order cannot be edited.
+- `CancelAllSpotOrdersAsync` (weight 100) and `CancelAllSpotSymbolOrdersAsync` (weight 25) return no order ids.
+- Closed orders: Bitvavo's history also lists open orders; they are dropped, so a page can be shorter than the limit.
+- Ledger: max 100 transactions per page, paged by page number; a trade is two entries sharing a `RelationId`; fees are not separate entries; the asset filter is applied per fetched page.
+- Deposit addresses: a request that names a network is rejected (one address per asset); fiat assets give an empty list. Withdraw: network required, network fee charged on top, id returned is Bitvavo's withdrawal id.
+- Kline intervals: 13 (`SharedKlineInterval` OneMinute to OneMonth, no ThreeMinutes), at most 1440 per request. Order book 1–1000 levels, `Nonce` is the sequence number.
+- Symbols: `GetSpotSymbolsAsync` fills a process-wide symbol cache behind `SpotSymbolCatalog`. The price grid is `PriceStep` and `PriceDecimals`, derived from `tickSize`.
+
+## Intent to method map
+
+REST (`client` = `BitvavoRestClient`; HTTP and weight in `docs/ai-api-map.md`):
+
+```text
+Markets, tick sizes, limits ....... client.SpotApi.ExchangeData.GetMarketsAsync()
+Candles ........................... client.SpotApi.ExchangeData.GetKlinesAsync("BTC-EUR", KlineInterval.OneHour, limit: 24)
+Server time ....................... client.SpotApi.ExchangeData.GetServerTimeAsync()
+Assets and networks ............... client.SpotApi.ExchangeData.GetAssetsAsync()
+Last price ........................ client.SpotApi.ExchangeData.GetTickerPricesAsync("BTC-EUR")
+Best bid and ask .................. client.SpotApi.ExchangeData.GetTickerBookAsync("BTC-EUR")
+24 h ticker ....................... client.SpotApi.ExchangeData.GetTicker24hAsync("BTC-EUR")
+Order book ........................ client.SpotApi.ExchangeData.GetOrderBookAsync("BTC-EUR", depth: 10)
+Public trades ..................... client.SpotApi.ExchangeData.GetPublicTradesAsync("BTC-EUR")
+Account info and fee tier ......... client.SpotApi.Account.GetAccountInfoAsync()
+Balances .......................... client.SpotApi.Account.GetBalancesAsync()
+Fee tier of a market .............. client.SpotApi.Account.GetTradingFeesAsync(market: "ETH-EUR")
+Staking balance ................... client.SpotApi.Account.GetStakingBalanceAsync()
+Ledger ............................ client.SpotApi.Account.GetTransactionHistoryAsync(page: 1, maxItems: 100)
+Cancel-on-disconnect .............. client.SpotApi.Account.ResetCancelOnDisconnectAsync(codGroupId: 1, expiryAfterSeconds: 30)
+Place order ....................... client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(...))
+Update order ...................... client.SpotApi.Trading.UpdateOrderAsync(new BitvavoUpdateOrderRequest(...))
+Get order ......................... client.SpotApi.Trading.GetOrderAsync("ETH-EUR", orderId: id)
+Cancel order ...................... client.SpotApi.Trading.CancelOrderAsync("ETH-EUR", operatorId, orderId: id)
+Cancel all ........................ client.SpotApi.Trading.CancelOrdersAsync(operatorId, "ETH-EUR")
+Atomic cancel one side ............ client.SpotApi.Trading.CancelOrdersAtomicAsync("ETH-EUR", OrderSide.Buy, operatorId)
+Open orders ....................... client.SpotApi.Trading.GetOpenOrdersAsync("ETH-EUR")
+Order history ..................... client.SpotApi.Trading.GetOrderHistoryAsync("ETH-EUR")
+Own trades ........................ client.SpotApi.Trading.GetUserTradesAsync("ETH-EUR")
+Deposit address ................... client.SpotApi.Funding.GetDepositAddressAsync("BTC")
+Deposit history ................... client.SpotApi.Funding.GetDepositHistoryAsync()
+Withdrawal history ................ client.SpotApi.Funding.GetWithdrawalHistoryAsync()
+Withdraw .......................... client.SpotApi.Funding.WithdrawAsync(new BitvavoWithdrawRequest(...))
+Withdraw crypto on a network ...... client.SpotApi.Funding.WithdrawCryptoAsync(new BitvavoCryptoWithdrawRequest(...))
+MiCA trades report ................ client.SpotApi.Report.GetTradesReportAsync("BTC-EUR")
+MiCA book report .................. client.SpotApi.Report.GetBookReportAsync("BTC-EUR")
+Subaccounts ....................... client.SpotApi.Institutional.CreateSubaccountAsync() / GetSubaccountsAsync()
+Subaccount transfers .............. client.SpotApi.Institutional.CreateTransferAsync(...) / GetTransferAsync(id) / GetTransfersAsync(subaccountId)
+Subaccount balances, ledger, orders  client.SpotApi.Institutional.GetSubaccountBalancesAsync() / GetSubaccountTransactionHistoryAsync() / GetSubaccountOpenOrdersAsync()
+Subaccount order cancellation ..... client.SpotApi.Institutional.CancelSubaccountOrderAsync(...) / CancelSubaccountOrdersAsync(operatorId)
+```
+
+WebSocket (`socketClient` = `BitvavoSocketClient`):
+
+```text
+Candles ........................... socketClient.SpotApi.ExchangeData.SubscribeToKlineUpdatesAsync("BTC-EUR", KlineInterval.OneMinute, handler)
+Public trades ..................... socketClient.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync("BTC-EUR", handler)
+Public trades, many markets ....... socketClient.SpotApi.ExchangeData.SubscribeToTradeUpdatesAsync(new[] { "BTC-EUR", "ETH-EUR" }, handler)
+Own order events .................. socketClient.SpotApi.Account.SubscribeToOrderUpdatesAsync(new[] { "ETH-EUR" }, handler)
+Own fills ......................... socketClient.SpotApi.Account.SubscribeToFillUpdatesAsync(new[] { "ETH-EUR" }, handler)
+```
+
+## Markets, sizing and the price grid
+
+```csharp
+var markets = await client.SpotApi.ExchangeData.GetMarketsAsync();
+var eth = markets.Success ? markets.Data.FirstOrDefault(m => m.Market == "ETH-EUR") : null;
+if (eth is null || eth.Status != BitvavoMarketStatus.Trading)
+{
+    return;   // order only while the market is in status Trading
+}
+
+var tick = eth.TickSize ?? 0.01m;
+var price = Math.Floor(1503.987m / tick) * tick;                                     // a multiple of tickSize, or error 422
+var amount = Math.Round(0.0123456789m, eth.QuantityDecimals ?? 8, MidpointRounding.ToZero);   // quantityDecimals decimals of base asset
+```
+
+- `MinOrderInBaseAsset`, `MinOrderInQuoteAsset`, `MaxOrderInBaseAsset`, `MaxOrderInQuoteAsset` are strings: parse with `CultureInfo.InvariantCulture`; an empty string means no figure.
+- `QuantityDecimals` limits the decimals of `Amount`; `NotionalDecimals` those of `AmountQuote`; a value with too many decimals is rejected with code 429 (`ErrorType.InvalidParameter`). A price with more than 15 decimals is code 215.
+- `BitvavoMarket.PricePrecision` is an `int?` and null on every market the live API lists. The price grid is `TickSize`.
+- `MaxOpenOrders` is the per-market figure (the live API returns 100, 200, 400 or null); Bitvavo's error table names 100 open orders per market as the limit (code 235, `ErrorType.RateLimitOrder`).
+- `BitvavoMarketStatus`: `Trading`, `Halted` (no create, update or cancel), `Auction` (no market orders, no matching), `AuctionMatching` (opening price is calculated), `CancelOnly` (cancels only). Interacting with a market that is not in trading status can fail with codes 423–426 or 431 (`UnavailableSymbol`, transient).
+
+## Order lifecycle
+
+- A new order starts as `OrderStatus.New`, or `AwaitingTrigger` for stop-loss and take-profit types (it moves to `New` under the same order id when it fires).
+- Active: `New`, `AwaitingTrigger`, `PartiallyFilled` (update or cancel possible). Completed: `Filled`, `Expired` (a market order without liquidity or balance, or IOC/FOK that could not execute), `Canceled`, `CanceledAuction`, `CanceledSelfTradePrevention`, `CanceledIoc`, `CanceledFok`, `CanceledMarketProtection`, `CanceledPostOnly`, `Rejected`.
+- Why an order was cancelled or reduced: `BitvavoOrder.RestatementReason` (string, for example `cancelOnDisconnect`, `cancelOnSelfTradePrevention`, `cancelPostOnly`).
+- Track state with the private `order` and `fill` events, and read back over REST for certainty: `GetOrderAsync(market, orderId:)`, or by `clientOrderId:`.
+- `BitvavoOrder.Fills` lists the fills embedded in an order (`BitvavoFill`); `Fee` and `FeeCurrency` are absent while a fill is not settled.
+- Self-trade prevention: `SelfTradePrevention` on place (`DecrementAndCancel`, `CancelOldest`, `CancelNewest`, `CancelBoth`).
+- Market protection cancels orders that would execute far from the market price; `DisableMarketProtection: true` on place switches it off for that order.
+
+## Cancel on disconnect
+
+Server-side dead-man switch: Bitvavo cancels every open order of a group when no `cancelOrdersAfter` arrives before the timer expires.
+
+```csharp
+// 1) Create the group (codGroupId 1) with a 30 s timer. Minimum 10 s; 0 removes the group. Bitvavo allows one group by default.
+var group = await client.SpotApi.Account.ResetCancelOnDisconnectAsync(codGroupId: 1, expiryAfterSeconds: 30);
+Console.WriteLine(group.Success ? $"expires at unix {group.Data.TimeOfExpirySeconds}" : group.Error?.ToString());
+
+// 2) Place orders in the group (not for market orders)
+await client.SpotApi.Trading.PlaceOrderAsync(new BitvavoPlaceOrderRequest(
+    "ETH-EUR", OrderSide.Buy, OrderType.Limit, OperatorId: 1, Amount: 0.01m, Price: 1500m, CodGroupId: 1));
+
+// 3) Heartbeat at half the timer (every 15 s for a 30 s timer)
+using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+while (await timer.WaitForNextTickAsync())
+{
+    await client.SpotApi.Account.ResetCancelOnDisconnectAsync(codGroupId: 1, expiryAfterSeconds: 30);
+}
+```
+
+The heartbeat is documented at weight 5 and is deliberately never counted or refused by the client-side rate limiter: a refused heartbeat would let the timer expire. Bitvavo's failure code for a group problem is 433; it is not in the error table, so it maps to `ErrorType.Unknown`.
+
+## History and pagination
+
+The typed API does not paginate for you.
+
+```csharp
+// Own trades: Bitvavo serves a window of at most 24 h per request. Walk backwards one day at a time.
+var end = DateTime.UtcNow;
+for (var day = 0; day < 7; day++)
+{
+    var start = end.AddHours(-24);
+    var trades = await client.SpotApi.Trading.GetUserTradesAsync("ETH-EUR", limit: 1000, startTime: start, endTime: end);
+    if (!trades.Success)
+    {
+        break;
+    }
+
+    foreach (var fill in trades.Data)
+    {
+        Console.WriteLine($"{fill.Timestamp:u} {fill.Side} {fill.Amount} @ {fill.Price} fee={fill.Fee} {fill.FeeCurrency}");
+    }
+
+    end = start;
+}
+
+// Ledger: page number based
+var pageNumber = 1;
+while (true)
+{
+    var ledger = await client.SpotApi.Account.GetTransactionHistoryAsync(page: pageNumber, maxItems: 100);
+    if (!ledger.Success)
+    {
+        break;
+    }
+
+    foreach (var entry in ledger.Data.Items)
+    {
+        Console.WriteLine($"{entry.ExecutedAt:u} {entry.Type} sent={entry.SentAmount} {entry.SentCurrency} received={entry.ReceivedAmount} {entry.ReceivedCurrency}");
+    }
+
+    if (ledger.Data.CurrentPage >= ledger.Data.TotalPages)
+    {
+        break;
+    }
+
+    pageNumber++;
+}
+```
+
+- Cursors: `startTime` / `endTime` (wire `start`, `end`), `tradeIdFrom` / `tradeIdTo`, `orderIdFrom` / `orderIdTo`, `page` / `maxItems`. Histories return 1–1000 entries (default 500); Bitvavo describes them as latest to earliest (not measured live for every list); ledger `maxItems` 1–100.
+- Candles: `limit` 1–1440; `startTime` and `endTime` must align with the interval boundary (Bitvavo).
+- `GetUserTradesAsync(..., tradeId)`: Bitvavo documents `tradeId` as deprecated (read as `tradeIdTo`); prefer `tradeIdFrom` / `tradeIdTo`.
+
+## Funding
+
+```csharp
+var address = await client.SpotApi.Funding.GetDepositAddressAsync("BTC");   // crypto: Address (+ PaymentReference); fiat: Iban, Bic, Description
+
+// Networks of an asset come from the asset data
+var assets = await client.SpotApi.ExchangeData.GetAssetsAsync("BTC");
+var networks = assets.Success ? assets.Data.First().Networks : Array.Empty<string>();
+
+// Crypto withdrawal: the network is required; the fee is charged on top unless DeductFeeFromAmount is true.
+// The address must be verified in the account's address book. The IdempotencyKey makes a retry safe.
+var withdrawal = await client.SpotApi.Funding.WithdrawCryptoAsync(new BitvavoCryptoWithdrawRequest(
+    Asset: "BTC",
+    Network: "Bitcoin",
+    Address: "bc1q...",
+    Amount: 0.001m,
+    DeductFeeFromAmount: false,
+    IdempotencyKey: Guid.NewGuid().ToString()));
+
+// Older endpoint (address or IBAN, optional internal transfer between Bitvavo accounts)
+await client.SpotApi.Funding.WithdrawAsync(new BitvavoWithdrawRequest("EUR", 100m, "NL00BANK0123456789"));
+```
+
+Withdrawals move funds. Bitvavo disables 2FA and the e-mail address confirmation for API withdrawals: the API key's `withdraw` permission is the only gate. Withdrawal history status values: `awaiting_processing`, `awaiting_email_confirmation`, `awaiting_bitvavo_inspection`, `approved`, `sending`, `in_mempool`, `processed`, `completed`, `canceled`.
+
+## Institutional (subaccounts)
+
+Needs the main account's key with `Include all subaccounts`, `Internal Transfer` and `Administrative`.
+
+```csharp
+var sub = await client.SpotApi.Institutional.CreateSubaccountAsync("bot-1");
+if (sub.Success)
+{
+    var transfer = await client.SpotApi.Institutional.CreateTransferAsync(new BitvavoCreateTransferRequest(
+        SubaccountId: sub.Data.Id,
+        Direction: SubaccountTransferDirection.MasterToSub,
+        Symbol: "EUR",
+        Amount: 100m,
+        ClientRequestId: Guid.NewGuid().ToString()));
+
+    var balances = await client.SpotApi.Institutional.GetSubaccountBalancesAsync(subaccountId: sub.Data.Id);
+}
+```
+
+The rate limit budget is shared between the main account and its subaccounts.
+
+## Error handling
+
+Bitvavo, network and rate-limit failures come back as `result.Error`; exceptions are for misuse.
+
+```csharp
+var result = await client.SpotApi.Trading.PlaceOrderAsync(request);
+if (!result.Success)
+{
+    var error = result.Error!;
+    Console.WriteLine($"{error.ErrorType} code={error.ErrorCode} transient={error.IsTransient}: {error.Message}");
+
+    switch (error.ErrorType)
+    {
+        case ErrorType.InsufficientBalance:          // 216, 408
+        case ErrorType.InvalidQuantity:              // 210, 212, 217, 406
+            break;
+        case ErrorType.InvalidPrice:                 // 211, 213, 215, 422 (not on the tick size)
+            break;
+        case ErrorType.DuplicateClientOrderId:       // 220: the clientOrderId already exists in this market
+            break;
+        case ErrorType.UnknownOrder:                 // 240
+            break;
+        case ErrorType.Timeout when error.ErrorCode == "109":
+            // The request timed out and the order may or may not exist: read it back by clientOrderId before retrying.
+            break;
+        case ErrorType.RateLimitRequest:             // 105, 112
+            break;
+    }
+}
+```
+
+`Error` members: `ErrorType`, `ErrorCode` (string: Bitvavo's `errorCode`), `Code`, `Message`, `IsTransient`, `Exception`.
+
+Bitvavo code to `ErrorType` (an unlisted code gives `ErrorType.Unknown`; the table is `BitvavoErrors.SpotMapping`, internal):
+
+```text
+InvalidParameter            no   102 200 201 204 205 206 236 239 429 439 510
+MissingParameter            no   203 232
+RejectedOrderConfiguration  no   202 231 234
+InvalidQuantity             no   210 212 217 406
+InvalidPrice                no   211 213 215 422
+InsufficientBalance         no   216 408
+UnknownSymbol               no   219
+DuplicateClientOrderId      no   220
+RateLimitOrder              no   235          (more than 100 open orders in the market)
+InvalidStopParameters       no   237 238
+UnknownOrder                no   240
+UnavailableSymbol           yes  423 424 425 426 431   (market not in trading status)
+InvalidOperation            no   401 407 410 411 412 413 415 514
+InvalidOperation            yes  405 414      (withdrawal not possible yet)
+Unauthorized                no   301 305-314 316-320 322 402 403 409 511 512 513
+RiskError                   no   434 435 436 437 438
+SystemError                 yes  101 107 108 111 400 404 419
+MissingCredentials          no   300
+InvalidTimestamp            no   302 303 304
+RateLimitRequest            yes  105 112
+Timeout                     no   109          (verify the state before retrying)
+Timeout                     yes  430
+```
+
+- Code 429 is an HTTP 400 about too many decimals; it is unrelated to HTTP 429 (rate limit), which carries 105 or 112.
+- HTTP 429 keeps Bitvavo's code and message on a `ServerRateLimitError`. Bitvavo sends no `Retry-After`, and the library does not back off by itself after a 429.
+- Client-side errors: `ClientRateLimitError` (limiter refusal under `RateLimitingBehaviour.Fail`, or a request that can never fit), `ArgumentError` (Shared request validation), `NoApiCredentialsError`, `CancellationRequestedError`.
+
+Retry only what is transient. Never retry an order placement blindly:
+
+```csharp
+async Task<HttpResult<T>> WithRetry<T>(Func<Task<HttpResult<T>>> call, int maxAttempts = 3)
+{
+    HttpResult<T> last = default!;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        last = await call();
+        if (last.Success || last.Error?.IsTransient != true)
+        {
+            return last;
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(500 * Math.Pow(2, attempt - 1)));   // Bitvavo: retry after 500 ms, then longer
+    }
+
+    return last;
+}
+
+var markets = await WithRetry(() => client.SpotApi.ExchangeData.GetMarketsAsync());
+```
+
+For `PlaceOrderAsync`, always send a `ClientOrderId`; after a failure that may have reached the exchange, call `GetOrderAsync(market, clientOrderId: id)` first. A duplicate `ClientOrderId` is answered with code 220.
+
+## Rate limiting
+
+- Bitvavo: 1000 weight points per minute. Signed requests count per account (all keys and subaccounts), public requests per IP address. Overrun → HTTP 429 code 105; blocked for 1 minute (signed) or 15 minutes (IP). Each WebSocket session allows 5000 messages per second (code 112); the weight budget is shared by all connections.
+- The client counts every REST request against two separate sliding one-minute guards (signed, public), with the weight of each endpoint (most 1; balance, trades, histories 5; 24 h ticker without market 25; open orders and cancel all without market 100; atomic cancel 100; crypto withdrawal 25). Variable weights are passed per call. WebSocket frames are not counted. The cancel-on-disconnect heartbeat is never counted.
+- Default `MaxUtilization` is 0.9 (90 % utilization): 10 % of each budget stays free for other processes on the same account or IP, so 900 points per minute are usable per budget. A request that would overrun waits (`RateLimitingBehaviour.Wait`, default behaviour) or fails with `ClientRateLimitError` (`Fail`).
+- `BitvavoExchange.RateLimiter` is one static, settable `BitvavoRateLimiters` for the whole process (the budget belongs to the account or IP, not to a client). Set it at start-up; a replacement counts from zero.
+
+```csharp
+BitvavoExchange.RateLimiter = new BitvavoRateLimiters(maxUtilization: 0.8, weightPerMinute: 1000);
+
+BitvavoExchange.RateLimiter.RateLimitTriggered += trigger =>
+    Console.WriteLine($"limit hit: weight {trigger.RequestWeight}, current {trigger.Current}/{trigger.Limit}, wait {trigger.DelayTime}");
+BitvavoExchange.RateLimiter.RateLimitUpdated += update =>
+    Console.WriteLine($"usage {update.Current}/{update.Limit}");
+
+// Fail fast instead of waiting
+using var client = new BitvavoRestClient(o => o.RateLimitingBehaviour = RateLimitingBehaviour.Fail);
+
+// Per-client ratio on top of MaxUtilization: the stricter wins
+using var careful = new BitvavoRestClient(o => o.RateLimitAdmission = (_, _) => RateLimitAdmission.WithMaxUtilizationRatio(0.5));
+```
+
+- `BitvavoRateLimiters(double maxUtilization = 0.9, int weightPerMinute = 1000)`: `maxUtilization` must lie between `100 / weightPerMinute` (the heaviest request must fit) and 1; `weightPerMinute` must be at least 100. Otherwise `ArgumentOutOfRangeException`.
+- Cheaper calls: pass a market where one is optional (`GetOpenOrdersAsync("ETH-EUR")` 5 instead of 100, `GetTicker24hAsync("BTC-EUR")` 1 instead of 25), and prefer WebSocket subscriptions (candles, trades, order and fill events) over polling.
+
+## Time sync (`AutoTimestamp`)
+
+Signed requests carry `Bitvavo-Access-Timestamp` and `Bitvavo-Access-Window`; Bitvavo rejects a request that arrives outside the window (codes 302, 303, 304 → `ErrorType.InvalidTimestamp`).
+
+```csharp
+using var client = new BitvavoRestClient(o =>
+{
+    o.ApiCredentials = new BitvavoCredentials(apiKey, apiSecret);
+    o.AutoTimestamp = true;       // measures the clock offset through the public GET /v2/time before the first signed request
+    o.ReceiveWindowMs = 10_000;   // Bitvavo-Access-Window in ms: default 10000, Bitvavo maximum 60000
+});
+```
+
+- The time request is public on purpose (a signed one would need the sync it performs), and a failing time request does not block the signed call. `TimestampRecalculationInterval` (CryptoExchange.Net option) sets how often the offset is measured again.
+- `ReceiveWindowMs` exists on `BitvavoRestOptions` and `BitvavoSocketOptions`; the socket value is the `window` of the `authenticate` action. The socket `authenticate` timestamp comes from the same time source as REST signing.
+- Raise `ReceiveWindowMs` or fix the clock when you see code 304.
+
+## Credentials and rotation (`SetApiCredentials`)
+
+```csharp
+var credentials = new BitvavoCredentials(apiKey, apiSecret);                       // key + secret
+var viaHmac = new BitvavoCredentials(new HMACCredential(apiKey, apiSecret));       // same thing
+var empty = new BitvavoCredentials();                                              // public endpoints only
+
+// Switch key on a live client: restClient / socketClient are an IBitvavoRestClient / IBitvavoSocketClient or the concrete classes
+restClient.SetApiCredentials(new BitvavoCredentials(newKey, newSecret));
+socketClient.SetApiCredentials(new BitvavoCredentials(newKey, newSecret));
+```
+
+- REST: the next signed request signs with the new key.
+- Socket: a private subscription made afterwards authenticates with the new key on a connection of its own. The old key's connection stays open for the subscriptions it already carries. Setting the same key again keeps the connection. A public subscription made after a key change reuses the open connection. A reconnect authenticates again with the key held at that moment.
+- `BitvavoCredentials.Copy()` is a deep copy. Never commit keys; read them from configuration or a secret store.
+- Key permissions in Bitvavo: view, trade, withdraw (plus `Include all subaccounts`, `Internal Transfer`, `Administrative` for the institutional endpoints). Reading orders and trades needs view and trade together. Missing permission → codes 310, 311, 312, 511, 512, 513 (`ErrorType.Unauthorized`). When the key has an IP whitelist in Bitvavo, a request from another IP fails with code 307.
+
+## WebSocket lifecycle
+
+- One connection serves many channels; `SocketSubscriptionsCombineTarget` (default 10) subscriptions are combined per connection. Bitvavo sets no limit on connections; the rate limit is shared by all of them.
+- The library reconnects and resubscribes automatically. `UpdateSubscription` events: `ConnectionLost`, `ConnectionRestored` (offline time), `ConnectionClosed`, `ResubscribingFailed`, `Exception`, `SubscriptionStatusChanged`, `ActivityPaused`, `ActivityUnpaused`.
+- Close: cancel the `ct` you passed to the subscribe call, `await subscription.Data.CloseAsync()`, `await socketClient.UnsubscribeAsync(subscription.Data)`, or `await socketClient.UnsubscribeAllAsync()` at shutdown. Inspect: `socketClient.CurrentSubscriptions`, `socketClient.CurrentConnections`.
+- A restart of Bitvavo's matching engine can reset the order-book `nonce`; WebSocket connections stay connected.
+- Options on `BitvavoSocketOptions`: `ReceiveWindowMs`, `SocketSubscriptionsCombineTarget`, `SocketNoDataTimeout`, `ReconnectPolicy`, `ReconnectInterval`, `MaxSocketConnections`, `ApiCredentials`, `Environment`.
+
+## Wire format
+
+- Prices and amounts: JSON strings (`"amount":"0.5"`); responses parse into `decimal`. Sub-cent values with exponent notation (`1e-8`) parse too.
+- `DateTime`: unix milliseconds. The nanosecond properties (`CreatedNs`, `UpdatedNs`, `TimestampNs`, `TimeNs`) hold unix nanoseconds as `long`.
+- Enums: wire strings (`KlineInterval.OneWeek` = `1W`, `OneMonth` = `1M`, `OneMinute` = `1m`; `TimeInForce.GoodTillCanceled` = `GTC`; `OrderStatus.CanceledIoc` = `canceledIOC`).
+- Candles and order book levels are positional JSON arrays on the wire; `BitvavoKline` and `BitvavoOrderBookEntry` hide that.
+- Query strings and JSON bodies are sorted ordinally, case-insensitively. DELETE `/v2/order` and `/v2/orders` send parameters in the query; atomic cancel and the institutional DELETEs send a JSON body (signed).
+- Signature: HMAC-SHA256 hex (lower case) over `timestamp + METHOD + "/v2/path[?query]" + body`.
+
+## Pitfalls
+
+1. `operatorId` is required on place, update, cancel, cancel all, atomic cancel (typed: `BitvavoPlaceOrderRequest.OperatorId`, `BitvavoUpdateOrderRequest.OperatorId`, `CancelOrderAsync(market, operatorId, ...)`, `CancelOrdersAsync(operatorId, market)`; Shared: exchange parameter `OperatorId`, `long`). Requests without it are rejected by Bitvavo. Reads need none.
+2. `clientOrderId` must be a UUID and unique per market (code 220 `DuplicateClientOrderId`). `Guid.NewGuid().ToString()`; Shared: `GenerateClientOrderId()`.
+3. `pricePrecision` is null on every live market: use `TickSize`. A price off the grid is code 422.
+4. Fee rates are fractions: `0.0015` = 0.15 %. `BitvavoMarketFee.Maker` and `Taker`, `BitvavoFeeTier.Maker` and `Taker`, `BitvavoFill.Fee` (an amount in `FeeCurrency`). The Shared `SharedFee` is a percentage.
+5. `Amount` (base asset) and `AmountQuote` (quote asset) are mutually exclusive (code 236); an update cannot switch between them (239); a market order cannot be updated (234). `AmountQuote` is meant for market orders and for stop-loss and take-profit without a limit price.
+6. `AddBitvavo(o => o.ApiCredentials = ...)` gives credentials to REST only. Use `(BitvavoOptions o) => ...`.
+7. Public endpoints stay unsigned, even with credentials, and use the per-IP budget; the report endpoints are public too. Signed endpoints use the per-account budget.
+8. Weights that bite: `GetOpenOrdersAsync()` and `CancelOrdersAsync(operatorId)` without a market cost 100 (10 % of the 1000-point minute budget), `GetTicker24hAsync()` without a market 25, `WithdrawCryptoAsync` 25.
+9. The account channel gives `order` and `fill` events only. No balances, no ticker, no book on the socket. A subscribe is "sent" = success; wrong markets are not reported; Bitvavo `error` events are not routed.
+10. Order and fill events have no guaranteed order; reconcile with REST after reconnects.
+11. Candle `startTime` and `endTime` must align with the interval; public and own trades windows are at most 24 h.
+12. `GetOrderHistoryAsync` also returns open orders. `GetOpenOrdersAsync` without a market returns every market.
+13. Cancel-on-disconnect: minimum 10 s, 0 removes the group, one group by default, not for market orders; the heartbeat is never counted by the limiter.
+14. API withdrawals skip 2FA and e-mail confirmation. The address must be in the address book. `WithdrawCryptoAsync` needs `Network` (names from `BitvavoAsset.Networks`).
+15. Status `Trading` only: filter markets by `BitvavoMarketStatus.Trading` before ordering.
+16. `BitvavoAccountInfo.Capabilities` is not part of the v2.10.0 spec response: do not depend on it.
+17. Code 109 (timeout) is not transient: the operation may have happened. Read the order back before retrying. HTTP 429 is not backed off automatically.
+18. Order placement over WebSocket (`privateCreateOrder`) is not implemented. Place, update and cancel over REST.
+19. `SharedClient` (V1) is kept for compatibility; new code uses `SharedApi` / `IBitvavoSharedApiClient`. Shared exchange parameters need the right value type (`1L`, `string[]`, `TriggerReference`).
+20. `BitvavoExchange` and `BitvavoRateLimiters` live in the namespace `Bitvavo.Net.Objects.Internal` (public types).
+21. No testnet and no dry-run or validate-only flag: every order call hits the live account. Test with the smallest amount the market allows (`MinOrderInQuoteAsset`).
+22. `GetTicker24hAsync`, `GetTickerBookAsync`, `GetTickerPricesAsync` always return `IEnumerable<T>`: with a market filter the collection holds one item.
+
+## Not implemented
+
+- Public WebSocket `ticker`, `ticker24h` and `book` channels.
+- `SymbolOrderBook`, trackers (`ITrackerFactory`), user-client-provider (multi-user).
+- WebSocket request/response actions (`privateCreateOrder` etc.).
+- WebSocket `error` event routing.
+- Balance subscription (Bitvavo's account channel emits only order and fill events).
+- Batch orders (no Bitvavo endpoint). Futures and margin (Bitvavo is spot only).
+- Custom or sandbox environment (none exists); dry-run or validate-only order flag (none exists).
+- Not measured without live credentials: whether the signed budget is per API key or per account (the limiter assumes per account), the reply to a rejected socket `authenticate`, the firing direction of stop loss and take profit (the usual meaning is assumed).
+
+## Anti-hallucination checklist
+
+Before finalizing generated code:
+
+- Uses `BitvavoRestClient` / `BitvavoSocketClient` (or the injected interfaces), the right sub-client (`ExchangeData`, `Account`, `Trading`, `Funding`, `Report`, `Institutional`) and `SpotApi` (spot is the only API: no futures, no margin).
+- Checks `.Success` before `.Data`, on every REST result and every subscription result.
+- Orders carry `OperatorId`; `ClientOrderId` is a UUID; price is a multiple of `TickSize`; `Amount` xor `AmountQuote`.
+- Funding calls use `SpotApi.Funding`, not `SpotApi.Account`.
+- Credentials via `BitvavoCredentials`; both transports covered when DI is used.
+- No WebSocket ticker, book or balance subscription; no `SymbolOrderBook`; no batch order call; no testnet environment.
+- REST result type written as `HttpResult<T>`, subscription result as `WebSocketResult<UpdateSubscription>`.
+- Shared API: capability looked up with `GetCapability<T>()` and null-checked, exchange parameters `OperatorId` (`long`) and `Markets` (`string[]`) supplied.
+- No `.Result` or `.Wait()`; subscriptions unsubscribed at shutdown; clients reused and disposed.
+- Weights considered for loops: market filters on open orders and tickers.
+
+## Source of truth for member names
+
+When unsure, read these instead of guessing:
+
+```text
+Bitvavo.Net/Interfaces/Clients/IBitvavoRestClient.cs
+Bitvavo.Net/Interfaces/Clients/IBitvavoSocketClient.cs
+Bitvavo.Net/Interfaces/Clients/IBitvavoSharedApiClient.cs
+Bitvavo.Net/Interfaces/Clients/SpotApi/IBitvavoRestClientSpotApi*.cs
+Bitvavo.Net/Interfaces/Clients/SpotApi/IBitvavoSocketClientSpotApi*.cs
+Bitvavo.Net/Objects/Models/Spot/**
+Bitvavo.Net/Enums/**
+Bitvavo.Net/Objects/Options/**
+Bitvavo.Net/Extensions/BitvavoServiceCollectionExtensions.cs
+Bitvavo.Net/Examples/ReadmeSamples/ReadmeSamples.cs      compiled samples (REST, WebSocket, DI, Shared API)
+Bitvavo.Net/Examples/QuickStart/Program.cs               runnable program (DI, one REST call, one WebSocket subscription)
+docs/ai-api-map.md
+ARCHITECTURE.md
+```

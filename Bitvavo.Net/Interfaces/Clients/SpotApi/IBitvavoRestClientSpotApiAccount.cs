@@ -20,7 +20,7 @@ public interface IBitvavoRestClientSpotApiAccount
     /// <para><a href="https://docs.bitvavo.com/docs/rest-api/get-account-balance">Bitvavo API docs</a></para>
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoAccountInfo>> GetAccountInfoAsync(CancellationToken ct = default);
+    Task<HttpResult<BitvavoAccountInfo>> GetAccountInfoAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Get the balances of all assets, optionally filtered to a single symbol.
@@ -28,29 +28,38 @@ public interface IBitvavoRestClientSpotApiAccount
     /// </summary>
     /// <param name="symbol">Optional asset symbol (e.g. <c>"BTC"</c>) to filter the result. Null returns all assets.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<IEnumerable<BitvavoBalance>>> GetBalancesAsync(string? symbol = null, CancellationToken ct = default);
+    Task<HttpResult<IEnumerable<BitvavoBalance>>> GetBalancesAsync(string? symbol = null, CancellationToken ct = default);
 
     /// <summary>
     /// Get the market-specific fee schedule for the active 30-day-volume tier.
     /// <para><a href="https://docs.bitvavo.com/docs/rest-api/get-account-fees">Bitvavo API docs</a></para>
     /// </summary>
     /// <param name="market">Optional market identifier (e.g. <c>"ETH-EUR"</c>) to scope the fee response.</param>
+    /// <param name="quote">Optional quote asset (<c>"EUR"</c> or <c>"USDC"</c>) to scope the fee response to every market with that quote.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoMarketFee>> GetTradingFeesAsync(string? market = null, CancellationToken ct = default);
+    Task<HttpResult<BitvavoMarketFee>> GetTradingFeesAsync(string? market = null, string? quote = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Get the staked amount per asset, optionally filtered to a single symbol (weight 5).
+    /// <para><a href="https://docs.bitvavo.com/docs/rest-api/get-staking-balance">Bitvavo API docs</a></para>
+    /// </summary>
+    /// <param name="symbol">Optional asset symbol (e.g. <c>"ADA"</c>) to filter the result. Null returns every staked asset.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<HttpResult<IEnumerable<BitvavoStakingBalance>>> GetStakingBalanceAsync(string? symbol = null, CancellationToken ct = default);
 
     /// <summary>
     /// Set or refresh the server-side cancel-on-disconnect deadline for orders tagged with
     /// <paramref name="codGroupId"/>. The Bitvavo broker cancels every open order in the group
     /// when no further <c>POST /v2/cancelOrdersAfter</c> lands before
-    /// <paramref name="expiryAfterSeconds"/>. Fase 1 dead-man-switch primitive — replaces an
-    /// ill-conceived per-order REST-polling bandaid that the entry-council M7 inspector verified
-    /// is not a real Bitvavo endpoint.
+    /// <paramref name="expiryAfterSeconds"/>: a dead-man switch for the case the caller loses its
+    /// connection. The call is never held back by the client-side rate limiter (documented weight 5),
+    /// because a refused heartbeat lets the timer expire and the orders are cancelled.
     /// <para><a href="https://docs.bitvavo.com/docs/cancel-on-disconnect">Bitvavo API docs</a></para>
     /// </summary>
     /// <param name="codGroupId">Numeric cancel-on-disconnect group identifier.</param>
     /// <param name="expiryAfterSeconds">Seconds until the broker cancels the group (minimum 10; 0 removes the group).</param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
+    Task<HttpResult<BitvavoCancelOrdersAfter>> ResetCancelOnDisconnectAsync(
         int codGroupId, int expiryAfterSeconds, CancellationToken ct = default);
 
     /// <summary>
@@ -71,7 +80,7 @@ public interface IBitvavoRestClientSpotApiAccount
     /// <c>rebate</c>, <c>loan</c>, <c>external_transferred_funds</c>, <c>manually_assigned</c>.
     /// </param>
     /// <param name="ct">Cancellation token.</param>
-    Task<WebCallResult<BitvavoTransactionHistory>> GetTransactionHistoryAsync(
+    Task<HttpResult<BitvavoTransactionHistory>> GetTransactionHistoryAsync(
         DateTime? fromDate = null,
         DateTime? toDate = null,
         int? page = null,

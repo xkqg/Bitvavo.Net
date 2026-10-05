@@ -27,7 +27,7 @@ internal sealed class BitvavoSocketClientSpotApiAccount : IBitvavoSocketClientSp
     }
 
     /// <inheritdoc />
-    public Task<CallResult<UpdateSubscription>> SubscribeToOrderUpdatesAsync(
+    public Task<WebSocketResult<UpdateSubscription>> SubscribeToOrderUpdatesAsync(
         string[] markets,
         Action<DataEvent<BitvavoStreamOrderUpdate>> onMessage,
         CancellationToken ct = default)
@@ -39,7 +39,7 @@ internal sealed class BitvavoSocketClientSpotApiAccount : IBitvavoSocketClientSp
             ct: ct);
 
     /// <inheritdoc />
-    public Task<CallResult<UpdateSubscription>> SubscribeToFillUpdatesAsync(
+    public Task<WebSocketResult<UpdateSubscription>> SubscribeToFillUpdatesAsync(
         string[] markets,
         Action<DataEvent<BitvavoStreamFillEvent>> onMessage,
         CancellationToken ct = default)
@@ -56,7 +56,7 @@ internal sealed class BitvavoSocketClientSpotApiAccount : IBitvavoSocketClientSp
     /// per-type via the <c>typeIdentifier</c> the message handler extracts from each
     /// incoming JSON's <c>event</c> field.
     /// </summary>
-    private Task<CallResult<UpdateSubscription>> SubscribeAccountAsync<T>(
+    private Task<WebSocketResult<UpdateSubscription>> SubscribeAccountAsync<T>(
         string[] markets,
         string typeIdentifier,
         Action<DataEvent<T>> onMessage,
@@ -105,7 +105,7 @@ internal sealed class BitvavoAccountSubscription<T> : Subscription
         // Per-market routing: the message handler extracts each event's market via
         // AddTopicMapping<T>(x => x.Market); this subscription declares the market set it
         // wants, so two disjoint subscriptions never see each other's events.
-        MessageRouter = MessageRouter.CreateWithTopicFilters<T>(typeIdentifier, _markets, DoHandleMessage);
+        MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, _markets, DoHandleMessage);
     }
 
     protected override CryptoExchange.Net.Sockets.Query? GetSubQuery(SocketConnection connection) =>
@@ -139,6 +139,6 @@ internal sealed class BitvavoAccountSubscription<T> : Subscription
     public CallResult DoHandleMessage(SocketConnection connection, DateTime receiveTime, string? originalData, T message)
     {
         _handler.Invoke(receiveTime, originalData, message);
-        return CallResult.SuccessResult;
+        return CallResult.Ok();
     }
 }

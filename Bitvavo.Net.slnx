@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="Bitvavo.Net.Tests/Bitvavo.Net.Tests.csproj" />
   <Project Path="Bitvavo.Net/Bitvavo.Net.csproj" />
+  <Project Path="Bitvavo.Net/Examples/QuickStart/QuickStart.csproj" />
+  <Project Path="Bitvavo.Net/Examples/ReadmeSamples/ReadmeSamples.csproj" />
 </Solution>

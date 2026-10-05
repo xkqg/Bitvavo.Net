@@ -12,18 +12,14 @@ using Xunit;
 namespace Bitvavo.Net.Tests;
 
 /// <summary>
-/// Drives Phase 2C — currently <see cref="BitvavoSocketSpotMessageHandler"/> registers
-/// <c>AddTopicMapping&lt;BitvavoStreamOrderUpdate&gt;(_ =&gt; string.Empty)</c> and the
-/// equivalent for fill events. Two account subscriptions on disjoint markets therefore
-/// share the same routing key (empty), so any incoming order/fill is dispatched to BOTH
-/// subscriptions — a privacy-class bug.
+/// Pins the routing key of the private account-channel events in
+/// <see cref="BitvavoSocketSpotMessageHandler"/>: the topic selectors are <c>x =&gt; x.Market</c>, so each
+/// subscription only receives the order and fill events of the markets it asked for. An empty key would give
+/// two account subscriptions on disjoint markets the same routing key and dispatch every event to both — a
+/// privacy-class bug.
 ///
-/// After the fix the topic selectors must be <c>x =&gt; x.Market</c> so each subscription
-/// only receives events for the markets it asked for.
-///
-/// The tests reach into the framework's internal mapping store via reflection: a full
-/// socket round-trip would require pinning the auth-WS HMAC signature (deferred), but the
-/// topic-selector contract is what actually drives Bitvavo's per-subscription dispatch.
+/// The tests reach into the framework's internal mapping store via reflection; the end-to-end dispatch
+/// (authenticate, subscribe, events) is covered by <see cref="BitvavoSocketAccountDispatchTests"/>.
 /// </summary>
 public class BitvavoSocketAccountFilterTests
 {
@@ -33,11 +29,17 @@ public class BitvavoSocketAccountFilterTests
         {
             foreach (var f in t.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
             {
-                if (f.GetValue(handler) is not IDictionary dict) continue;
+                if (f.GetValue(handler) is not IDictionary dict)
+                {
+                    continue;
+                }
+
                 foreach (DictionaryEntry entry in dict)
                 {
                     if (entry.Key is Type k && k == typeof(T) && entry.Value is Delegate del)
+                    {
                         return del;
+                    }
                 }
             }
         }
@@ -47,7 +49,11 @@ public class BitvavoSocketAccountFilterTests
     private static string? InvokeTopic<T>(BitvavoSocketSpotMessageHandler handler, T sample)
     {
         var del = FindTopicMapping<T>(handler);
-        if (del is Func<T, string> typed) return typed(sample);
+        if (del is Func<T, string> typed)
+        {
+            return typed(sample);
+        }
+
         return del?.DynamicInvoke(sample) as string;
     }
 
@@ -59,7 +65,7 @@ public class BitvavoSocketAccountFilterTests
 
         var topic = InvokeTopic(handler, sample);
 
-        // Phase 2C contract: per-market routing — never empty (would route to all).
+        // Per-market routing — never empty (an empty key would route to every subscription).
         topic.ShouldBe("BTC-EUR");
     }
 

@@ -32,7 +32,7 @@ public sealed class BitvavoRestClient : BaseRestClient<BitvavoEnvironment, Bitva
         : base(loggerFactory, "Bitvavo")
     {
         Initialize(options.Value);
-        SpotApi = AddApiClient(new BitvavoRestClientSpotApi(_logger, httpClient, options.Value));
+        SpotApi = AddApiClient(new BitvavoRestClientSpotApi(loggerFactory, httpClient, options.Value));
     }
 
     /// <summary>Set the default options used by every new <see cref="BitvavoRestClient"/>.</summary>

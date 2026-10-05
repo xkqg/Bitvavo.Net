@@ -17,3 +17,6 @@ TestResults/
 # NuGet packages
 *.nupkg
 *.snupkg
+
+# Working analysis manifests (council / rijloop / path manifests): kept in the private Exchange repo, not published here
+.path-manifests/
