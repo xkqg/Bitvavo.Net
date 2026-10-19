@@ -1,11 +1,11 @@
-# Bitvavo.Net 0.5.0 full LLM context — copy-paste guide to the Bitvavo REST and WebSocket client: exact API surface, quick starts, errors, rate limits, pitfalls.
+# Bitvavo.Net 0.5.1 full LLM context — copy-paste guide to the Bitvavo REST and WebSocket client: exact API surface, quick starts, errors, rate limits, pitfalls.
 
 > Detailed reference for generating correct C#/.NET code with Bitvavo.Net. Routing tables with HTTP verb, path, auth and weight per method: `docs/ai-api-map.md`. Member lists: `Bitvavo.Net/Interfaces/Clients/**`. Design: `ARCHITECTURE.md`.
 
 ## Facts
 
-- NuGet package `Bitvavo.Net`, version 0.5.0 (pre-1.0: the API can still change between minor versions). Repository https://github.com/xkqg/Bitvavo.Net. MIT.
-- Targets net8.0, net9.0, net10.0. Built on CryptoExchange.Net 13.1.0 (structure of Kraken.Net 8.6.0, both load in one process).
+- NuGet package `Bitvavo.Net`, version 0.5.1 (pre-1.0: the API can still change between minor versions). Repository https://github.com/xkqg/Bitvavo.Net. MIT.
+- Targets net8.0, net9.0, net10.0. Built on CryptoExchange.Net 13.2.1 (structure of Kraken.Net 8.6.0, both load in one process).
 - Bitvavo is spot only. No futures, no margin, no testnet: `BitvavoEnvironment.Live` is the only environment (REST `https://api.bitvavo.com`, WebSocket `wss://ws.bitvavo.com/v2/`).
 - Coverage matches Bitvavo REST API docs v2.10.0. All REST paths sit under `/v2/`.
 - Results: REST `HttpResult<T>`, subscriptions `WebSocketResult<UpdateSubscription>`. Protocol errors are results, not exceptions.

@@ -5,8 +5,8 @@ description: Use Bitvavo.Net when generating C#/.NET code for the Bitvavo crypto
 
 # Bitvavo.Net
 
-.NET client for the Bitvavo spot REST and WebSocket APIs. Built on CryptoExchange.Net 13.1.0.
-Package id: `Bitvavo.Net`. Repository version: 0.5.0 (pre-1.0, the API may change in a minor release).
+.NET client for the Bitvavo spot REST and WebSocket APIs. Built on CryptoExchange.Net 13.2.1.
+Package id: `Bitvavo.Net`. Repository version: 0.5.1 (pre-1.0, the API may change in a minor release).
 Targets: net8.0, net9.0, net10.0.
 Bitvavo is spot only. No futures, no margin, no testnet.
 
@@ -410,6 +410,7 @@ Request path: sub-client -> `RequestDefinitionCache.GetOrCreate` -> `RestApiClie
 3. Implement in `BitvavoSocketClientSpotApiExchangeData` / `BitvavoSocketClientSpotApiAccount` with `BitvavoSubscription<T>` (public) or `BitvavoAccountSubscription<T>` (private, authenticated). Subscribe through `SubscribeInternalAsync`.
 4. Register the topic key in `BitvavoSocketSpotMessageHandler` with `AddTopicMapping<T>(...)`. The event type comes from the `event` field of each message.
 5. Subscribe and unsubscribe are fire-and-forget (`BitvavoSubscribeQuery`): Bitvavo sends no per-request acknowledgment.
+6. A subscription implements `IBitvavoChannelSubscription` and builds its frames with `BitvavoSubscribeQuery.Subscribe` / `Unsubscribe`: the unsubscribe names only what no other live subscription on the connection needs (`BitvavoChannelDemand`), because Bitvavo's server holds one flat set of channel entries and CryptoExchange.Net cannot tell partial overlap. Add a case to `BitvavoOverlappingSubscriptionTests` for a new channel.
 
 ## 20. Add a Shared API capability
 

@@ -83,13 +83,12 @@ internal sealed class BitvavoSocketClientSpotApiAccount : IBitvavoSocketClientSp
 /// <summary>
 /// Authenticated subscription on the Bitvavo <c>account</c> channel. Mirrors
 /// <see cref="BitvavoSubscription{T}"/> but flips <c>authenticated: true</c> so the
-/// framework's <see cref="CryptoExchange.Net.Clients.SocketApiClient.GetAuthenticationRequestAsync"/>
+/// framework's <see cref="CryptoExchange.Net.Clients.SocketApiClient.GetAuthenticationRequestAsync(CryptoExchange.Net.Sockets.Default.SocketConnection)"/>
 /// is invoked before this subscription's <c>subscribe</c> payload is sent.
 /// </summary>
-internal sealed class BitvavoAccountSubscription<T> : Subscription
+internal sealed class BitvavoAccountSubscription<T> : Subscription, IBitvavoChannelSubscription
 {
     private readonly Action<DateTime, string?, T> _handler;
-    private readonly string[] _markets;
 
     public BitvavoAccountSubscription(
         ILogger logger,
@@ -99,42 +98,22 @@ internal sealed class BitvavoAccountSubscription<T> : Subscription
         : base(logger, authenticated: true)
     {
         _handler = handler;
-        _markets = markets;
+        Channel = new BitvavoSocketChannel { Name = "account", Markets = markets };
 
         IndividualSubscriptionCount = markets.Length;
         // Per-market routing: the message handler extracts each event's market via
         // AddTopicMapping<T>(x => x.Market); this subscription declares the market set it
         // wants, so two disjoint subscriptions never see each other's events.
-        MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, _markets, DoHandleMessage);
+        MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, markets, DoHandleMessage);
     }
 
-    protected override CryptoExchange.Net.Sockets.Query? GetSubQuery(SocketConnection connection) =>
-        new BitvavoSubscribeQuery(new BitvavoSocketRequest
-        {
-            Action = "subscribe",
-            Channels = new[]
-            {
-                new BitvavoSocketChannel
-                {
-                    Name = "account",
-                    Markets = _markets,
-                },
-            },
-        });
+    /// <inheritdoc />
+    public BitvavoSocketChannel Channel { get; }
 
-    protected override CryptoExchange.Net.Sockets.Query? GetUnsubQuery(SocketConnection connection) =>
-        new BitvavoSubscribeQuery(new BitvavoSocketRequest
-        {
-            Action = "unsubscribe",
-            Channels =
-            [
-                new BitvavoSocketChannel
-                {
-                    Name = "account",
-                    Markets = _markets,
-                }
-            ],
-        });
+    protected override CryptoExchange.Net.Sockets.Query? GetSubQuery(SocketConnection connection) => BitvavoSubscribeQuery.Subscribe(Channel);
+
+    // The order and the fill subscription share the one Bitvavo channel "account": closing one must not stop the other.
+    protected override CryptoExchange.Net.Sockets.Query? GetUnsubQuery(SocketConnection connection) => BitvavoSubscribeQuery.Unsubscribe(connection, this, Channel);
 
     public CallResult DoHandleMessage(SocketConnection connection, DateTime receiveTime, string? originalData, T message)
     {

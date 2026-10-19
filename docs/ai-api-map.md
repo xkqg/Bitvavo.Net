@@ -1,8 +1,8 @@
-# Bitvavo.Net 0.5.0 AI API map — routes an intent to the exact client member, HTTP verb + path, auth need and rate-limit weight.
+# Bitvavo.Net 0.5.1 AI API map — routes an intent to the exact client member, HTTP verb + path, auth need and rate-limit weight.
 
 Rule: member, parameter or type not listed here → read `Bitvavo.Net/Interfaces/Clients/**` before generating code. Never invent endpoints. Never call Bitvavo over raw `HttpClient`, never sign by hand.
 
-Facts: NuGet `Bitvavo.Net` 0.5.0 · net8.0, net9.0, net10.0 · built on CryptoExchange.Net 13.1.0 · Bitvavo is spot only · matches Bitvavo REST API docs v2.10.0 · REST base `https://api.bitvavo.com` (every path below sits under `/v2/`) · WebSocket `wss://ws.bitvavo.com/v2/` · no testnet, `BitvavoEnvironment.Live` is the only environment.
+Facts: NuGet `Bitvavo.Net` 0.5.1 · net8.0, net9.0, net10.0 · built on CryptoExchange.Net 13.2.1 · Bitvavo is spot only · matches Bitvavo REST API docs v2.10.0 · REST base `https://api.bitvavo.com` (every path below sits under `/v2/`) · WebSocket `wss://ws.bitvavo.com/v2/` · no testnet, `BitvavoEnvironment.Live` is the only environment.
 
 ## Namespaces
 

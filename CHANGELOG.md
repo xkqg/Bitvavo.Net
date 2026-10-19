@@ -6,6 +6,22 @@ All notable changes to **Bitvavo.Net** are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-19
+
+Moves the dependency to **CryptoExchange.Net 13.2.1** and stops overlapping WebSocket subscriptions from silencing each other.
+
+### Fixed
+- **Closing a subscription no longer unsubscribes what another live subscription still needs.** Bitvavo's server keeps one set of (channel, market, interval) entries per connection and an `unsubscribe` removes entries whoever asked for them. CryptoExchange.Net 13.2 sends no subscribe frame for a subscription an earlier one covers, so closing the earlier, larger subscription took the feed of the covered one with it: measured live on the public WebSocket, `SubscribeToTradeUpdatesAsync(["BTC-EUR", "ETH-EUR"])` followed by `SubscribeToTradeUpdatesAsync("ETH-EUR")`, closing the first, left the second with 0 trades in 120 s while a control connection received 22 (it kept receiving all 22 on CryptoExchange.Net 13.1.0). CryptoExchange.Net 13.1 had the mirror-image hole (closing a subset first took the superset's market). The unsubscribe frame now names only the entries no other live subscription on the connection needs, and no frame is sent when nothing is left (`BitvavoChannelDemand`).
+- **Closing the order subscription no longer stops the fill events, and the other way round.** `SubscribeToOrderUpdatesAsync` and `SubscribeToFillUpdatesAsync` are two subscriptions on the one Bitvavo channel `account`; each close sent `unsubscribe account` for the markets of both. (Wire-level proof; Bitvavo's reaction needs an API key and was not measured.)
+
+### Changed
+- Depends on `CryptoExchange.Net` **13.2.1** (was 13.1.0), the version this release was tested on. From 13.2 CryptoExchange.Net records the success of a response-less subscribe query itself, so `BitvavoSubscribeQuery` no longer presets its result; 13.2.1 also fixes 13.2.0 treating a subscription without routes as covered (this library's subscriptions always have routes).
+- Consumers that share one process with Binance.Net 13.7.0 (which asks for CryptoExchange.Net 13.1.0 or newer) now run both on 13.2.1.
+
+### Documentation
+- ARCHITECTURE section 5 describes the unsubscribe rule and why it is needed on every CryptoExchange.Net version.
+- Verified against the Bitvavo documentation of 2026-10-19: API v2.10.0 is unchanged, the newest release (2026-08-07, `operatorId` in trade history and the order and fill events) is already covered, and all 41 REST and institutional operations of the specifications have a row in the endpoint contract table.
+
 ## [0.5.0] — 2026-10-05
 
 Moves the library from CryptoExchange.Net 11.1.1 to **13.1.0** (the structure of Kraken.Net 8.6.0, so both libraries load in one process), brings the Bitvavo API coverage up to the documentation v2.10.0, and replaces the rate limiter.

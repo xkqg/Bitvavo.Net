@@ -1,6 +1,6 @@
 # Copilot Instructions for Bitvavo.Net
 
-This repository is **Bitvavo.Net** - a strongly typed C#/.NET client library for the Bitvavo spot REST and WebSocket APIs. It is built on CryptoExchange.Net 13.1.0, targets net8.0, net9.0 and net10.0, and has no futures, no margin and no testnet.
+This repository is **Bitvavo.Net** - a strongly typed C#/.NET client library for the Bitvavo spot REST and WebSocket APIs. It is built on CryptoExchange.Net 13.2.1, targets net8.0, net9.0 and net10.0, and has no futures, no margin and no testnet.
 
 Two jobs: generating code that consumes Bitvavo.Net, and editing this library. Follow the matching section.
 

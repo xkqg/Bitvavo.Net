@@ -15,7 +15,7 @@ namespace Bitvavo.Net.Objects.Internal;
 /// <see cref="Clients.MessageHandlers.BitvavoSocketSpotMessageHandler"/>), and emits a
 /// fire-and-forget subscribe / unsubscribe query in the canonical Bitvavo wire envelope.
 /// </summary>
-internal sealed class BitvavoSubscription<T> : Subscription
+internal sealed class BitvavoSubscription<T> : Subscription, IBitvavoChannelSubscription
 {
     private readonly Action<DateTime, string?, T> _handler;
     private readonly BitvavoSocketChannel _channel;
@@ -55,19 +55,12 @@ internal sealed class BitvavoSubscription<T> : Subscription
         MessageRouter = MessageRouter.CreateForEvent<T>(typeIdentifier, topics, DoHandleMessage);
     }
 
-    protected override Query? GetSubQuery(SocketConnection connection) =>
-        new BitvavoSubscribeQuery(new BitvavoSocketRequest
-        {
-            Action = "subscribe",
-            Channels = new[] { _channel },
-        });
+    /// <inheritdoc />
+    public BitvavoSocketChannel Channel => _channel;
 
-    protected override Query? GetUnsubQuery(SocketConnection connection) =>
-        new BitvavoSubscribeQuery(new BitvavoSocketRequest
-        {
-            Action = "unsubscribe",
-            Channels = new[] { _channel },
-        });
+    protected override Query? GetSubQuery(SocketConnection connection) => BitvavoSubscribeQuery.Subscribe(_channel);
+
+    protected override Query? GetUnsubQuery(SocketConnection connection) => BitvavoSubscribeQuery.Unsubscribe(connection, this, _channel);
 
     public CallResult DoHandleMessage(SocketConnection connection, DateTime receiveTime, string? originalData, T message)
     {

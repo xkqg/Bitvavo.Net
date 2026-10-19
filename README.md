@@ -8,13 +8,13 @@ A .NET client library for the [Bitvavo](https://bitvavo.com) REST and WebSocket 
 
 This package is a community contribution, intended for adoption into the JKorf exchange-clients ecosystem alongside `Binance.Net`, `Kraken.Net`, `Bybit.Net`, etc. — same API patterns, same `HttpResult<T>` result discipline, same options shape, same DI extension surface, same Shared API. It loads next to the other CryptoExchange.Net clients in one process.
 
-The package targets `net8.0;net9.0;net10.0` and is built on `CryptoExchange.Net 13.1.0`.
+The package targets `net8.0;net9.0;net10.0` and is built on `CryptoExchange.Net 13.2.1`.
 
 For information on the clients, dependency injection, response processing, and the shared interfaces, see the [CryptoExchange.Net documentation](https://cryptoexchange.jkorf.dev). How this library is put together is described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Status
 
-`v0.5.0` (pre-1.0: the API can still change between minor versions — see the [CHANGELOG](CHANGELOG.md)):
+`v0.5.1` (pre-1.0: the API can still change between minor versions — see the [CHANGELOG](CHANGELOG.md)):
 
 - ✅ Public REST: markets, candles, server time, assets, ticker prices, top of book, 24 h ticker, order book, public trades, and the MiCA report endpoints
 - ✅ Public WebSocket: candle and trade subscriptions
